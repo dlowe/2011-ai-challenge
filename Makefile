@@ -1,7 +1,7 @@
 ZIP   := 2011-ai-challenge.zip
 FILES := MyBot.clj ants.clj
 
-$(ZIP): $(FILES)
+$(ZIP): test $(FILES)
 	zip $@ $(FILES)
 
 .PHONY: clean
