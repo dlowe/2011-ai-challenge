@@ -14,8 +14,8 @@ class TestAnnihilation(TestTactic, unittest.TestCase):
           """
 
     def assertions(self, game):
-        self.assertEquals(game['replaydata']['cutoff'], 'turn limit reached')
         self.assertEquals(game['status'][0], 'survived')
+        self.assertEquals(game['replaydata']['cutoff'], 'turn limit reached')
 
 class TestGreedyAnnihilation(TestTactic, unittest.TestCase):
     """Ants shouldn't crash into each other in the hunt for food!"""
@@ -27,8 +27,8 @@ class TestGreedyAnnihilation(TestTactic, unittest.TestCase):
           """
 
     def assertions(self, game):
-        self.assertEquals(game['replaydata']['cutoff'], 'turn limit reached')
         self.assertEquals(game['status'][0], 'survived')
+        self.assertEquals(game['replaydata']['cutoff'], 'turn limit reached')
 
 if __name__ == '__main__':
     unittest.main(argv=sys.argv)
