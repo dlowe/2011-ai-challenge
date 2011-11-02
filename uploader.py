@@ -38,4 +38,5 @@ data = '\r\n'.join([
 ])
 request = urllib2.Request('http://aichallenge.org/check_submit.php', data, {'content-type': 'multipart/form-data; boundary=%s' % sep})
 r = urllib2.urlopen(request)
-print r.read()
+assert r.geturl() == 'http://aichallenge.org/check_submit.php', r.geturl()
+assert 'Success!' in r.read(), "Doesn't look like success..."
