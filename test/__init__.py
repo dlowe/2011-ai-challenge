@@ -37,8 +37,20 @@ class TestTactic(object):
 
             try:
                 subprocess.call('(cd ./tools; python ./playgame.py --scenario --food none --log_dir %s --turns 30 --map_file %s "java clojure.main ../MyBot.clj" "python submission_test/TestBot.py" --nolaunch -e --strict --capture_errors)' % (log_dir, map_file.name), shell=True)
-                game = json.loads(open("%s/0.replay" % log_dir).read())
+                self.game = json.loads(open("%s/0.replay" % log_dir).read())
+                # print json.dumps(self.game, sort_keys=True, indent=4)
             finally:
                 shutil.rmtree(log_dir)
 
-        self.assertions(game)
+        self.assertions(self.game)
+
+    def assertFoodEaten(self, food_row, food_col, turn=0, player=0):
+        for f in (self.game['replaydata']['food']):
+            if f[0] == food_row and f[1] == food_col:
+                self.assertEquals(f[3], turn, "food (%d, %d) eaten on turn %d" % (food_row, food_col, turn))
+                self.assertEquals(f[4], player, "food (%d, %d) eaten by player %d" % (food_row, food_col, player))
+                return
+        self.assert_(False, "no food at (%d, %d)" % (food_row, food_col))
+
+    def assertSurvived(self, player=0):
+        self.assertEquals(self.game['status'][player], 'survived')
