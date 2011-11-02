@@ -36,7 +36,7 @@ class TestTactic(object):
             log_dir = tempfile.mkdtemp()
 
             try:
-                subprocess.call('(cd ./tools; python ./playgame.py --food none --log_dir %s --turns 30 --map_file %s "java clojure.main ../MyBot.clj" "python submission_test/TestBot.py" --nolaunch -e --strict --capture_errors)' % (log_dir, map_file.name), shell=True)
+                subprocess.call('(cd ./tools; python ./playgame.py --scenario --food none --log_dir %s --turns 30 --map_file %s "java clojure.main ../MyBot.clj" "python submission_test/TestBot.py" --nolaunch -e --strict --capture_errors)' % (log_dir, map_file.name), shell=True)
                 game = json.loads(open("%s/0.replay" % log_dir).read())
             finally:
                 shutil.rmtree(log_dir)
