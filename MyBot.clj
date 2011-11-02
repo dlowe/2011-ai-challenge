@@ -12,7 +12,7 @@
   a valid move, defaults to random-no-suicide."
   (let [nearest-food (nearest ant (food))]
     (if nearest-food
-      (let [food-directions (filter #(valid-move? ant %) (direction ant nearest-food))]
+      (let [food-directions (filter #(and (valid-move? ant %) (not (contains? occupied (move-ant ant %)))) (direction ant nearest-food))]
         (if (empty? food-directions)
           (pick-random-no-suicide-direction ant occupied)
           (first food-directions)))
