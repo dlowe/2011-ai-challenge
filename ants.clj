@@ -214,22 +214,10 @@
             [(offset-dir [row 0])
              (offset-dir [0 col])])))
 
-(defn nearest [loc locations]
-  "Determine the nearest location (out of the collection 'locations') to 
-  startloc. Shouldn't I be able to do this with some tricky (map) application 
-  as a one liner?"
-  (if (empty? locations)
-    nil
-    (loop [best (first locations), best-d (distance loc best), cur best, cur-d best-d, remaining (rest locations)]
-      (let [next-cur (first remaining) next-remaining (rest remaining)]
-        (if next-cur
-          (let [next-d (distance loc next-cur)]
-            (if (< cur-d best-d)
-              (recur cur cur-d next-cur next-d next-remaining)
-              (recur best best-d next-cur next-d next-remaining)))
-          (if (< cur-d best-d)
-            cur
-            best))))))
+(defn nearest [loc locations] 
+  "Return the location in collection 'locations' which is closest to loc.
+  Use David's oneliner instead of my ugly mess."
+  (first (sort-by (partial distance loc) locations)))
 
 ; FOR REPL TESTING
 (def ^{:dynamic true} *game-info* {:rows 20 :cols 20})
