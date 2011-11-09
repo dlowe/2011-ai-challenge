@@ -26,4 +26,4 @@ repl:
 .PHONY: smoke
 smoke:
 	CLASSPATH=$(CLASSPATH):`pwd`
-	(cd ./tools; ./playgame.py --player_seed 42 --end_wait=0.25 --verbose -E --log_dir game_logs --turns 200 --map_file maps/maze/maze_04p_01.map "java clojure.main ../MyBot.clj" "python sample_bots/python/LeftyBot.py" "python sample_bots/python/HunterBot.py" "python sample_bots/python/GreedyBot.py")
+	(cd ./tools; ./playgame.py --player_seed 42 --end_wait=0.25 --verbose -E --log_dir game_logs --turns 200 --map_file maps/random_walk/random_walk_04p_01.map "java clojure.main ../MyBot.clj" "python sample_bots/python/LeftyBot.py" "python sample_bots/python/HunterBot.py" "python sample_bots/python/GreedyBot.py")
