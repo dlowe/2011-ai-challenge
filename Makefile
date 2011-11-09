@@ -6,6 +6,7 @@ test:
 	CLASSPATH=$(CLASSPATH):`pwd`
 	(cd ./tools; ./test_bot.sh "java clojure.main ../MyBot.clj")
 	python -m test.tactics
+	java clojure.main test/test.clj
 
 $(ZIP): test $(FILES)
 	zip $@ $(FILES)

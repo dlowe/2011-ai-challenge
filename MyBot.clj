@@ -77,7 +77,7 @@
 
 (defn prioritize-objectives [objectives remaining-ants]
   ; currently, this sorts by "ease of accomplishing" heuristic, i.e. the distance of the closest ant
-  (sort-by #(do ;(binding [*out* *err*] (println %)
+  (sort-by #(do ;(binding [*out* *err*] (println % remaining-ants (nearest (second %) remaining-ants)))
     (apply min (map (partial distance (second %)) remaining-ants))) objectives))
 
 (defn move-ants [initial-ants]
@@ -101,7 +101,7 @@
             (let [ant (first ant-dir) dir (second ant-dir)]
               ; TODO: if we take radius into account, an ant may 'incidentally' achieve multiple
               ; objectives, which we would want to filter out of 'others' at this point.
-              (recur (remove #(identical? ant %) ants) others (cons [ant dir] ant-dirs) (conj destinations (move-ant ant dir)))))))))))
+              (recur (disj ants ant) others (cons [ant dir] ant-dirs) (conj destinations (move-ant ant dir)))))))))))
 
 (defn simple-bot []
   (doseq [ant-dirs (move-ants (my-ants))]

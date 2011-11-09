@@ -214,15 +214,56 @@
             [(offset-dir [row 0])
              (offset-dir [0 col])])))
 
-(defn nearest [loc locations] 
+(defn from-origin-n [n]
+  "Return the vector of coordinates exactly n moves from the origin"
+  (if (zero? n)
+    '([0 0])
+    (for [[r c dr dc] [[n 0 -1 +1] [0 n -1 -1] [(- n) 0 +1 -1] [0 (- n) +1 +1]] i (range n)]
+      [(+ r (* i dr)) (+ c (* i dc))])))
+
+(defn from-origin []
+  "Return a lazy, infinite sequence of coordinates ordered by distance from the origin"
+  (for [n (range) coord (from-origin-n n)] coord))
+
+(defn extents [rows cols]
+  "Returns AABB bounding box coordinates for a map sized (rows x cols)"""
+  (let [qr (quot (- rows 1) 2) rr (rem (- rows 1) 2) qc (quot (- cols 1) 2) rc (rem (- cols 1) 2)]
+    [(- qr) (- qc) (+ qr rr) (+ qc rc)]))
+
+(def trimmed-from-origin (memoize (fn [rows cols]
+  "Return finite sequence of coordinates on a map sized (rows x cols), ordered by distance from
+   the origin."
+  (let [result (let [[min_r min_c max_r max_c] (extents rows cols) r-ok? (fn [r] (and (<= r max_r) (>= r min_r))) c-ok? (fn [c] (and (<= c max_c) (>= c min_c)))]
+    (doall (for [[r c] (from-origin) :while (or (r-ok? r) (c-ok? c)) :when (and (r-ok? r) (c-ok? c))] [r c])))]
+    (do ;(binding [*out* *err*] (println "trimmed-from-origin:" rows cols result))
+      result)))))
+
+(defn origin-point-to-local-point [rows cols [r c]]
+  [(if (neg? r) (+ rows r) r) (if (neg? c) (+ cols c) c)])
+
+(defn trimmed-from-local-point [rows cols [r c]]
+  "Returns lazy sequence of coordinates on a map sized (rows x cols), ordered by distance from
+   the given point."
+  (do
+    (assert (>= r 0))
+    (assert (>= c 0))
+    (assert (< r rows))
+    (assert (< c cols))
+    (let [result (map #(let [[dr dc] %] (origin-point-to-local-point rows cols [(rem (+ r dr) rows) (rem (+ c dc) cols)])) (trimmed-from-origin rows cols))]
+      (do ;(binding [*out* *err*] (println "trimmed-from-local-point:" rows cols r c result))
+        result))))
+
+(defn nearest [loc locations]
   "Return the location in collection 'locations' which is closest to loc.
   Use David's oneliner instead of my ugly mess."
-  (sort-by (partial distance loc) locations))
+  (sort-by (partial distance loc) locations)
+  ;(filter #(locations %) (trimmed-from-local-point (game-info :rows) (game-info :cols) loc))
+)
 
 ; FOR REPL TESTING
 (def ^{:dynamic true} *game-info* {:rows 20 :cols 20})
 (def loc [7 7])
-(def locs [[1 1] [2 2] [3 3] [4 4] [5 5]])
+(def locs #{[1 1] [2 2] [3 3] [4 4] [5 5]})
 ; END FOR REPL TESTING
 
 (defn start-game 
