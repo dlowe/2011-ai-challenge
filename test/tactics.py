@@ -94,5 +94,24 @@ class TestShitloadsOfFoodAndAnts(TestTactic, unittest.TestCase):
         for x in range(self.repeat):
             self.assertFoodEaten(1, x * 4 + 1, turn=1)
 
+class TestBlockedGreed(TestTactic, unittest.TestCase):
+    """Should be able to get around obstacles."""
+
+    map = """
+          %%%%%%%%%%%%
+          %...*%%%%%B%
+          %.%%%%%%%%%%
+          %...A%%%%%%%
+          %%%%%%%%%%%%
+          """
+
+    def assertions(self, game):
+        ## no dying!
+        self.assertSurvived()
+        self.assertEquals(game['replaydata']['cutoff'], 'turn limit reached')
+
+        ## food is reachable in 7 moves
+        self.assertFoodEaten(1, 4, turn=7)
+
 if __name__ == '__main__':
     unittest.main(argv=sys.argv)
