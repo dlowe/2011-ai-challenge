@@ -217,7 +217,7 @@
 (defn nearest [loc locations] 
   "Return the location in collection 'locations' which is closest to loc.
   Use David's oneliner instead of my ugly mess."
-  (first (sort-by (partial distance loc) locations)))
+  (sort-by (partial distance loc) locations))
 
 ; FOR REPL TESTING
 (def ^{:dynamic true} *game-info* {:rows 20 :cols 20})
