@@ -1,5 +1,6 @@
 (ns ants
-  (:require [clojure.string :as string]))
+  (:require [clojure.string :as string])
+  (:use clojure.set))
 
 (use 'clojure.stacktrace)
 
@@ -33,11 +34,11 @@
                  [1 0] :south
                  [0 1] :east})
 
-(def messages {:ready #"ready"
-               :turn #"turn [0-9]+"
-               :end #"end"
-               :go #"go"
-               :tile #"\w \d+ \d+"})
+(def messages {:ready #"^ready$"
+               :turn #"^turn [0-9]+$"
+               :end #"^end$"
+               :go #"^go$"
+               :tile #"^\w "})
 
 (def map-tiles {"f" :food 
                 "w" :water 
@@ -45,22 +46,14 @@
                 "d" :dead-ant
                 "h" :hill})
 
+(def ant-tiles #{:ant :dead-ant})
+
 ;;****************************************************************
 ;; Implementation functions
 ;;****************************************************************
 
-(defn- parse-tile [msg]
-  (let [[tile row col player :as parts] (string/split (string/lower-case msg) #" ")
-        player (when player
-                     (Integer. player))]
-    {:tile (map-tiles tile)
-     :row (Integer. row)
-     :col (Integer. col)
-     :player player}))
-
 (defn- message? [msg-type msg]
-  (re-seq (messages msg-type) (string/lower-case msg)))
-
+  (re-find (messages msg-type) msg))
 
 (defn- build-game-info []
   (loop [cur (read-line)
@@ -75,23 +68,15 @@
   (Integer. (or (second (string/split msg #" ")) 0)))
 
 (defn- update-tile [state {:keys [tile row col player]}]
-  (let [loc [row col]
-        ant (conj loc player)]
+  (let [loc [row col]]
         (condp = tile
           :water (update-in state [:water] conj loc)
-          :dead-ant (update-in state [:dead] conj ant)
+          :dead-ant (update-in state [:dead] conj (conj loc player))
           :ant (if (zero? player)
                  (update-in state [:ants] conj loc) 
-                 (update-in state [:enemies] conj ant))
+                 (update-in state [:enemies] conj (conj loc player)))
           :food (update-in state [:food] conj loc)
           :hill (update-in state [:hill] conj loc))))
-
-(defn- update-state [state msg]
-  (cond
-    (message? :turn msg) (merge init-state {:turn (get-turn msg) 
-                                            :water (or (:water state) #{})})
-    (message? :tile msg) (update-tile state (parse-tile msg))
-    :else state))
 
 (defn- contains-ant? [ants cur]
   (some #(let [[r c p] %]
@@ -216,15 +201,56 @@
             [(offset-dir [row 0])
              (offset-dir [0 col])])))
 
-(defn nearest [loc locations] 
+(defn from-origin-n [n]
+  "Return the vector of coordinates exactly n moves from the origin"
+  (if (zero? n)
+    '([0 0])
+    (for [[r c dr dc] [[n 0 -1 +1] [0 n -1 -1] [(- n) 0 +1 -1] [0 (- n) +1 +1]] i (range n)]
+      [(+ r (* i dr)) (+ c (* i dc))])))
+
+(defn from-origin []
+  "Return a lazy, infinite sequence of coordinates ordered by distance from the origin"
+  (for [n (range) coord (from-origin-n n)] coord))
+
+(defn extents [rows cols]
+  "Returns AABB bounding box coordinates for a map sized (rows x cols)"""
+  (let [qr (quot (- rows 1) 2) rr (rem (- rows 1) 2) qc (quot (- cols 1) 2) rc (rem (- cols 1) 2)]
+    [(- qr) (- qc) (+ qr rr) (+ qc rc)]))
+
+(def trimmed-from-origin (memoize (fn [rows cols]
+  "Return finite sequence of coordinates on a map sized (rows x cols), ordered by distance from
+   the origin."
+  (let [result (let [[min_r min_c max_r max_c] (extents rows cols) r-ok? (fn [r] (and (<= r max_r) (>= r min_r))) c-ok? (fn [c] (and (<= c max_c) (>= c min_c)))]
+    (doall (for [[r c] (from-origin) :while (or (r-ok? r) (c-ok? c)) :when (and (r-ok? r) (c-ok? c))] [r c])))]
+    (do ;(binding [*out* *err*] (println "trimmed-from-origin:" rows cols result))
+      result)))))
+
+(defn origin-point-to-local-point [rows cols [r c]]
+  [(if (neg? r) (+ rows r) r) (if (neg? c) (+ cols c) c)])
+
+(defn trimmed-from-local-point [rows cols [r c]]
+  "Returns lazy sequence of coordinates on a map sized (rows x cols), ordered by distance from
+   the given point."
+  (do
+    (assert (>= r 0))
+    (assert (>= c 0))
+    (assert (< r rows))
+    (assert (< c cols))
+    (let [result (map #(let [[dr dc] %] (origin-point-to-local-point rows cols [(rem (+ r dr) rows) (rem (+ c dc) cols)])) (trimmed-from-origin rows cols))]
+      (do ;(binding [*out* *err*] (println "trimmed-from-local-point:" rows cols r c result))
+        result))))
+
+(defn nearest [loc locations]
   "Return the location in collection 'locations' which is closest to loc.
   Use David's oneliner instead of my ugly mess."
-  (first (sort-by (partial distance loc) locations)))
+  (sort-by (partial distance loc) locations)
+  ;(filter #(locations %) (trimmed-from-local-point (game-info :rows) (game-info :cols) loc))
+)
 
 ; FOR REPL TESTING
 ;(def ^{:dynamic true} *game-info* {:rows 20 :cols 20})
 (def loc [7 7])
-(def locs [[1 1] [2 2] [3 3] [4 4] [5 5]])
+(def locs #{[1 1] [2 2] [3 3] [4 4] [5 5]})
 
 (def test-terrain "
 %%%%%
@@ -304,8 +330,37 @@ m %%%%%...........%%%%%%%...........%%%%%")
     (def ^{:dynamic true} *game-info* game-info)
     (def ^{:dynamic true} *game-state* game-state)))
 
- 
 ; END FOR REPL TESTING
+
+(defn- parse-tile [msg]
+  (let [[tile row col player] (string/split msg #" ") player (when player (Integer. player)) tile-t (map-tiles tile)]
+    (if (tile-t ant-tiles)
+      [tile-t [(Integer. row) (Integer. col) player]]
+      [tile-t [(Integer. row) (Integer. col)]])))
+
+(defn turn-state-grep [turn-state tile-t]
+  (for [[t data] turn-state :when (identical? tile-t t)] data))
+
+(defn turn-state [pre-turn-state turn-state-strings]
+  (let [ts (map parse-tile turn-state-strings)]
+    (do ;(binding [*out* *err*] (println pre-turn-state ts))
+      {
+        :turn 0
+        :water (union (set (turn-state-grep ts :water)) (:water pre-turn-state))
+        :dead (set (turn-state-grep ts :dead-ant))
+        :enemies (set (remove #(== (% 2) 0) (turn-state-grep ts :ant)))
+        :ants (set (filter #(== (% 2) 0) (turn-state-grep ts :ant)))
+        :food (set (turn-state-grep ts :food))
+        :hill (set (turn-state-grep ts :hill))
+      })))
+
+(defn play-turn [pre-turn-state bot]
+  "Play a single turn with the given bot."
+  (let [state (turn-state pre-turn-state (for [cur (repeatedly read-line) :while (message? :tile cur)] cur))]
+    (binding [*game-state* state]
+      (bot)
+      (println "go")
+      state)))
 
 (defn start-game 
   "Play the game with the given bot."
@@ -313,13 +368,8 @@ m %%%%%...........%%%%%%%...........%%%%%")
   (when (message? :turn (read-line))
     (binding [*game-info* (build-game-info)]
       (println "go") ;; we're "setup" so let's start
-      (loop [cur (read-line)
-             state {}]
-        (if (message? :end cur) 
-          (collect-stats)
-          (do
-            (when (message? :go cur) 
-              (binding [*game-state* state]
-                (bot) (println "go")))
-            (recur (read-line) (update-state state cur))))))))
-
+      (loop [state init-state]
+        (let [cur (read-line)]
+          (if (message? :end cur)
+            (collect-stats)
+            (recur (play-turn state bot))))))))
