@@ -1,5 +1,6 @@
 (ns ants
-  (:require [clojure.string :as string]))
+  (:require [clojure.string :as string])
+  (:use clojure.set))
 
 ;;****************************************************************
 ;; Constants and lookups
@@ -257,13 +258,29 @@
 (def locs #{[1 1] [2 2] [3 3] [4 4] [5 5]})
 ; END FOR REPL TESTING
 
+(defn turn-state-grep [turn-state tile ant?]
+  (for [parsed-tile turn-state :when (identical? tile (:tile parsed-tile))] (if ant? [(:row parsed-tile) (:col parsed-tile) (:player parsed-tile)] [(:row parsed-tile) (:col parsed-tile)])))
+
+(defn turn-state [pre-turn-state turn-state-strings]
+  (let [ts (map parse-tile turn-state-strings)]
+    (do ;(binding [*out* *err*] (println pre-turn-state ts))
+      {
+        :turn 0
+        :water (union (set (turn-state-grep ts :water false)) (:water pre-turn-state))
+        :dead (set (turn-state-grep ts :dead-ant true))
+        :enemies (set (remove #(== (% 2) 0) (turn-state-grep ts :ant true)))
+        :ants (set (filter #(== (% 2) 0) (turn-state-grep ts :ant true)))
+        :food (set (turn-state-grep ts :food false))
+        :hill (set (turn-state-grep ts :hill false))
+      })))
+
 (defn play-turn [pre-turn-state bot]
   "Play a single turn with the given bot."
-  (loop [state (merge init-state { :turn (pre-turn-state :turn) :water (pre-turn-state :water) })]
-    (let [cur (read-line)]
-      (if (not (message? :tile cur))
-        (binding [*game-state* state] (bot) (println "go") state)
-        (recur (update-tile state (parse-tile cur)))))))
+  (let [state (turn-state pre-turn-state (for [cur (repeatedly read-line) :while (message? :tile cur)] cur))]
+    (binding [*game-state* state]
+      (bot)
+      (println "go")
+      state)))
 
 (defn start-game 
   "Play the game with the given bot."
