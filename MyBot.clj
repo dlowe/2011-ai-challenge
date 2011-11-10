@@ -104,8 +104,8 @@
               (recur (disj ants ant) others (cons [ant dir] ant-dirs) (conj destinations (move-ant ant dir)))))))))))
 
 (defn simple-bot []
-  (doseq [ant-dirs (move-ants (my-ants))]
-    (let [ant (first ant-dirs) dir (second ant-dirs)]
+  (do ;(binding [*out* *err*] (println "simple-bot"))
+    (doseq [[ant dir] (move-ants (my-ants))]
       (move ant dir))))
       
 (start-game simple-bot)

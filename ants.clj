@@ -258,7 +258,7 @@
       [tile-t [(Integer. row) (Integer. col)]])))
 
 (defn turn-state-grep [turn-state tile-t]
-  (for [parsed-tile turn-state :when (identical? tile-t (first parsed-tile))] (second parsed-tile)))
+  (for [[t data] turn-state :when (identical? tile-t t)] data))
 
 (defn turn-state [pre-turn-state turn-state-strings]
   (let [ts (map parse-tile turn-state-strings)]
