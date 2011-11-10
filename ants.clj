@@ -44,18 +44,11 @@
                 "d" :dead-ant
                 "h" :hill})
 
+(def ant-tiles #{:ant :dead-ant})
+
 ;;****************************************************************
 ;; Implementation functions
 ;;****************************************************************
-
-(defn- parse-tile [msg]
-  (let [[tile row col player :as parts] (string/split (string/lower-case msg) #" ")
-        player (when player
-                     (Integer. player))]
-    {:tile (map-tiles tile)
-     :row (Integer. row)
-     :col (Integer. col)
-     :player player}))
 
 (defn- message? [msg-type msg]
   (re-find (messages msg-type) msg))
@@ -258,20 +251,26 @@
 (def locs #{[1 1] [2 2] [3 3] [4 4] [5 5]})
 ; END FOR REPL TESTING
 
-(defn turn-state-grep [turn-state tile ant?]
-  (for [parsed-tile turn-state :when (identical? tile (:tile parsed-tile))] (if ant? [(:row parsed-tile) (:col parsed-tile) (:player parsed-tile)] [(:row parsed-tile) (:col parsed-tile)])))
+(defn- parse-tile [msg]
+  (let [[tile row col player] (string/split msg #" ") player (when player (Integer. player)) tile-t (map-tiles tile)]
+    (if (tile-t ant-tiles)
+      [tile-t [(Integer. row) (Integer. col) player]]
+      [tile-t [(Integer. row) (Integer. col)]])))
+
+(defn turn-state-grep [turn-state tile-t]
+  (for [parsed-tile turn-state :when (identical? tile-t (first parsed-tile))] (second parsed-tile)))
 
 (defn turn-state [pre-turn-state turn-state-strings]
   (let [ts (map parse-tile turn-state-strings)]
-    (do ;(binding [*out* *err*] (println pre-turn-state ts))
+    (do (binding [*out* *err*] (println pre-turn-state ts))
       {
         :turn 0
-        :water (union (set (turn-state-grep ts :water false)) (:water pre-turn-state))
-        :dead (set (turn-state-grep ts :dead-ant true))
-        :enemies (set (remove #(== (% 2) 0) (turn-state-grep ts :ant true)))
-        :ants (set (filter #(== (% 2) 0) (turn-state-grep ts :ant true)))
-        :food (set (turn-state-grep ts :food false))
-        :hill (set (turn-state-grep ts :hill false))
+        :water (union (set (turn-state-grep ts :water)) (:water pre-turn-state))
+        :dead (set (turn-state-grep ts :dead-ant))
+        :enemies (set (remove #(== (% 2) 0) (turn-state-grep ts :ant)))
+        :ants (set (filter #(== (% 2) 0) (turn-state-grep ts :ant)))
+        :food (set (turn-state-grep ts :food))
+        :hill (set (turn-state-grep ts :hill))
       })))
 
 (defn play-turn [pre-turn-state bot]
