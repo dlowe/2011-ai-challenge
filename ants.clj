@@ -31,11 +31,11 @@
                  [1 0] :south
                  [0 1] :east})
 
-(def messages {:ready #"ready"
-               :turn #"turn [0-9]+"
-               :end #"end"
-               :go #"go"
-               :tile #"\w \d+ \d+"})
+(def messages {:ready #"^ready$"
+               :turn #"^turn [0-9]+$"
+               :end #"^end$"
+               :go #"^go$"
+               :tile #"^\w "})
 
 (def map-tiles {"f" :food 
                 "w" :water 
@@ -57,8 +57,7 @@
      :player player}))
 
 (defn- message? [msg-type msg]
-  (re-seq (messages msg-type) (string/lower-case msg)))
-
+  (re-find (messages msg-type) msg))
 
 (defn- build-game-info []
   (loop [cur (read-line)
@@ -73,23 +72,15 @@
   (Integer. (or (second (string/split msg #" ")) 0)))
 
 (defn- update-tile [state {:keys [tile row col player]}]
-  (let [loc [row col]
-        ant (conj loc player)]
+  (let [loc [row col]]
         (condp = tile
           :water (update-in state [:water] conj loc)
-          :dead-ant (update-in state [:dead] conj ant)
+          :dead-ant (update-in state [:dead] conj (conj loc player))
           :ant (if (zero? player)
                  (update-in state [:ants] conj loc) 
-                 (update-in state [:enemies] conj ant))
+                 (update-in state [:enemies] conj (conj loc player)))
           :food (update-in state [:food] conj loc)
           :hill (update-in state [:hill] conj loc))))
-
-(defn- update-state [state msg]
-  (cond
-    (message? :turn msg) (merge init-state {:turn (get-turn msg) 
-                                            :water (or (:water state) #{})})
-    (message? :tile msg) (update-tile state (parse-tile msg))
-    :else state))
 
 (defn- contains-ant? [ants cur]
   (some #(let [[r c p] %]
@@ -266,19 +257,22 @@
 (def locs #{[1 1] [2 2] [3 3] [4 4] [5 5]})
 ; END FOR REPL TESTING
 
+(defn play-turn [pre-turn-state bot]
+  "Play a single turn with the given bot."
+  (loop [state (merge init-state { :turn (pre-turn-state :turn) :water (pre-turn-state :water) })]
+    (let [cur (read-line)]
+      (if (not (message? :tile cur))
+        (binding [*game-state* state] (bot) (println "go") state)
+        (recur (update-tile state (parse-tile cur)))))))
+
 (defn start-game 
   "Play the game with the given bot."
   [bot]
   (when (message? :turn (read-line))
     (binding [*game-info* (build-game-info)]
       (println "go") ;; we're "setup" so let's start
-      (loop [cur (read-line)
-             state {}]
-        (if (message? :end cur) 
-          (collect-stats)
-          (do
-            (when (message? :go cur) 
-              (binding [*game-state* state]
-                (bot) (println "go")))
-            (recur (read-line) (update-state state cur))))))))
-
+      (loop [state init-state]
+        (let [cur (read-line)]
+          (if (message? :end cur)
+            (collect-stats)
+            (recur (play-turn state bot))))))))
