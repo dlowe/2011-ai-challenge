@@ -23,6 +23,11 @@ repl:
 	CLASSPATH=$(CLASSPATH):`pwd`
 	java clojure.main -i ants.clj -e "(in-ns 'ants)" -r
 
+.PHONY: repl
+rrepl:
+	CLASSPATH=$(CLASSPATH):`pwd`
+	java jline.ConsoleRunner clojure.main -i ants.clj -e "(in-ns 'ants)" -r
+
 .PHONY: smoke
 smoke:
 	CLASSPATH=$(CLASSPATH):`pwd`
