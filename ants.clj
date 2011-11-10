@@ -262,7 +262,7 @@
 
 (defn turn-state [pre-turn-state turn-state-strings]
   (let [ts (map parse-tile turn-state-strings)]
-    (do (binding [*out* *err*] (println pre-turn-state ts))
+    (do ;(binding [*out* *err*] (println pre-turn-state ts))
       {
         :turn 0
         :water (union (set (turn-state-grep ts :water)) (:water pre-turn-state))
