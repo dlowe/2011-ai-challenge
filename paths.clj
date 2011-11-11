@@ -6,18 +6,49 @@
 
 ; Some utilities for path finding
 
+(def map3x3
+"rows 3
+cols 3
+players 0
+
+m ...
+m ...
+m ...")
+
+(def partitionedmap
+"rows 3
+cols 5
+players 0
+
+m .%.%.
+m .%.%.
+m .%.%.")
+
+(def horseshoemap
+"rows 5
+cols 10
+players 1
+
+m ..........
+m %.%%%%%...
+m %..a..%...
+m %%%%%%%...
+m .....*....")
+
 (defn 
   #^{:test (fn []
-             (assert (= 4 (count (neighbors [1 1]))))
-             (assert (= (into #{} (neighbors [1 1])) #{[0 1] [1 0] [1 2] [2 1]})))}
+             (let [[*game-info* *game-state*] (with-in-str map3x3 (game-from-map))]
+               (assert (= 4 (count (neighbors [1 1]))))
+               (assert (= (into #{} (neighbors [1 1])) #{[0 1] [1 0] [1 2] [2 1]}))
+               (assert (= (into #{} (neighbors [0 0])) #{[2 0] [0 1] [1 0] [0 2]}))))}
   neighbors [loc]
   "Return a list of neighboring locations which are valid moves.
   FIX: this should probably only take into account water, not ant locations,
   for the purposes of planning a route to a goal."
-  (println "neighbors " loc)
+  ;(println "neighbors " loc)
   (for [d (filter #(valid-move? loc %) [:north :west :south :east])] (move-ant loc d)))
 
-(defn twig [tree node] 
+(defn nodes-to-root [tree node] 
   "If tree is a map of child to parent links, and node is a node label, return
   the vector of nodes leading from node to the root in the tree."
   (loop [cur node res []] 
@@ -33,11 +64,16 @@
 ; a path can't be found using the algorithm.
 ;
 
+;
+; Straight line seeking path seems to be working.
+;
 (defn 
   #^{:test (fn []
-             (assert (= 0 (count (straight-line [0 0] [0 0]))))
-             (let [p (straight-line [3 5] [3 6])]
-               (assert (= (list [3 6]) p))))}
+             (let [[*game-info* *game-state*] (with-in-str partitionedmap (game-from-map))]
+               (assert (= 0 (count (straight-line [0 0] [0 0]))))
+               (let [p (straight-line [0 0] [2 0])]
+                 (assert (= (list [2 0]) p)))
+               (assert (empty? (straight-line [0 0] [1 2])))))}
   straight-line [loc goal]
   "Simplest thing that could possibly work; try to find a straight line
   path from loc to goal.  Return empty path if there is no such clear path."
@@ -45,29 +81,40 @@
     (if (= pos goal)
       (rest (conj path pos))
       (let [d (filter #(valid-move? pos %) (direction pos goal))]
-        (if d
-          (recur (conj path pos) (move-ant pos (first (direction pos goal))))
-          nil)))))
+        ;(println "pos " pos ", d " d)
+        (if (empty? d)
+          nil
+          (recur (conj path pos) (move-ant pos (first d))))))))
 
+(defn- make-to-open-filter [open closed]
+  #(and (not (contains? closed %)) (not (contains? open %))))
+
+
+; 
+; Greedy best first actually works now!
+;
 (defn greedy-best-first [loc goal estimator]
   "Return a list of locations which is a valid path from loc to goal, or nil
   if no such path exists.  estimator should be a function of 2 locations which
   gives an estimated cost for a path from one to the other."
-  (loop [open (priority-map) ; a priority map of loc -> priority, holds locations to check
-         closed {}           ; a map of          loc -> parent, entries indicated locations already checked
-         cur loc             ; the location we're handling right now
-         lastcur nil]        ; the last location we were handling
-    (if (not cur)
+  (loop [cur loc             ; the location we're handling right now
+         open (priority-map) ; a priority map of loc -> priority, holds locations to check
+         closed #{loc}       ; set of nodes we've already inspected
+         parents {loc nil}   ; a map of (loc -> parent) entries to reconstruct path
+         iters 0]
+    (if (or (not cur) (> iters 20))
       nil
-      (let [to-open (filter #(not (contains? closed %)) (neighbors cur))
+      (let [lastcur (get closed cur)
+            to-open (filter (make-to-open-filter open closed) (neighbors cur))
             open    (into open (map list to-open (map #(estimator % goal) to-open)))
-            closed  (assoc closed cur lastcur)
-            nextcur (first (peek open))]
-        (println "in let, to-open " to-open)
-        (println "  cur " cur ", nextcur " nextcur)
+            parents (into parents (map hash-map to-open (repeat cur)))
+            closed  (conj closed cur)]
+        ;(println "cur " cur ", open " open ", closed " closed)
         (if (= cur goal)
-          (rest (reverse (twig closed cur)))
-          (recur open closed nextcur cur))))))               
+          (rest (reverse (nodes-to-root parents cur)))
+          (if (empty? open)
+            nil
+            (recur (first (peek open)) (pop open) closed parents (+ iters 1))))))))
                
 ;
 ; Found A* overview at http://www.policyalmanac.org/games/aStarTutorial.htm simple enough for me ;)
@@ -82,6 +129,9 @@
 ; Considered writing the priority queue also, but that seemed masochistic.
 ;
 
+;
+; FIX: still not working
+;
 (defn A* [loc goal estimate]
   (loop [open (priority-map) ; the priority-map of "open" locations, or ones we wish to process, where priority is the estimated total path length
          closed #{}          ; the set of nodes we have already processed
@@ -90,7 +140,7 @@
          lastcur nil         ; the location we came from
          g 0]                ; the # of moves from the starting location up to cur
     (if (= cur goal)
-      (reverse (twig parents cur))
+      (reverse (nodes-to-root parents cur))
       (let [newlocs (filter #(not (contains? closed %)) (neighbors cur))
             [nextcur nextg] (peek open)]
         (recur (into open (map vector newlocs (repeat (count newlocs) (+ g 1 (estimate cur goal)))))
