@@ -59,30 +59,30 @@
   ; each objective currently consists of a label and a center.
   ; (currently ':food', the location of a food)
   ; TODO: take radius into account
-  (for [food_location (food)] [:food food_location])
+  (set (for [food_location (food)] [:food food_location]))
   ; TODO: objective representing "stay within the view radius of places where food has been seen before"
   ; TODO: objective representing "get on top of known enemy hills (radius 0)"
   ; TODO: objective representing "stay within the attack radius of my own hill"
   ; TODO: objective representing "get within view radius of unknown space"
 )
 
-(defn move-ant-to-objective [objective occupied remaining-ants]
-  ; returns the ant-dir tuple for the nearest ant capable of moving towards the objective, or nil if no
-  ; ant can currently move towards the objective
-  (do ;(binding [*out* *err*] (println objective))
-    (first
-      (for [ant (nearest (second objective) remaining-ants)
-        :let [dir (first (filter-moves ant occupied (direction ant (second objective))))]
-        :when (not (nil? dir))] [ant dir]))))
+(defn all-objective-ants [objectives remaining-ants]
+  "return a lazy sequence of [objective, sorted-candidates] tuples"
+  (for [[_ goal :as objective] objectives :let [ants (nearest goal remaining-ants)]] [objective ants]))
 
-(defn prioritize-objectives [objectives remaining-ants]
-  ; currently, this sorts by "ease of accomplishing" heuristic, i.e. the distance of the closest ant
-  (sort-by #(do ;(binding [*out* *err*] (println % remaining-ants (nearest (second %) remaining-ants)))
-    (apply min (map (partial distance (second %)) remaining-ants))) objectives))
+(defn prioritized-objective-ants [objectives remaining-ants]
+  "return the 'easiest' [ant, objective] tuple, where 'easiest' == closest to the closest associated ant"
+  (first (sort-by (fn [[[_ goal] ants]] (distance goal (first ants))) (all-objective-ants objectives remaining-ants))))
+
+(defn move-ant-todo [objective ants occupied]
+  "returns a legal [ant, dir] moving an ant toward the objective, or nil if impossible to do so"
+  (first (for [ant ants
+    :let [dir (first (filter-moves ant occupied (direction ant (second objective))))]
+    :when (not (nil? dir))] [ant dir])))
 
 (defn move-ants [initial-ants]
   (loop [ants initial-ants objectives (raw-objectives) ant-dirs [] destinations #{}]
-    (do ;(binding [*out* *err*] (println objectives ants))
+    (do ;(binding [*out* *err*] (println "move-ants:" objectives ants))
     (if (empty? ants)
       ; no ants to move, we're done!
       ant-dirs
@@ -93,7 +93,9 @@
             (recur others objectives (cons [ant dir] ant-dirs) (conj destinations (move-ant ant dir)))
             (recur others objectives ant-dirs destinations)))
         ; otherwise, try to accomplish the top objective
-        (let [todo (prioritize-objectives objectives ants) objective (first todo) others (rest todo) ant-dir (move-ant-to-objective objective destinations ants)]
+        (let [[objective candidates] (prioritized-objective-ants objectives ants)
+              others (disj objectives objective)
+              ant-dir (move-ant-todo objective candidates destinations)]
           (if (nil? ant-dir)
             ; skipping this objective; all ants remain available
             (recur ants others ant-dirs destinations)

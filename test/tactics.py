@@ -75,12 +75,9 @@ class TestDoubleGreed(TestTactic, unittest.TestCase):
 class TestShitloadsOfFoodAndAnts(TestTactic, unittest.TestCase):
     """Ants should be able to gather food efficiently even when there's lots of it and lots of them."""
 
-    repeat = 200
+    repeat = 60
     map = ('%%%%' * repeat + '\n'
          + '%*.A' * repeat + '\n'
-         + '%%%%' * repeat + '\n'
-         + '%%%%' * repeat + '\n'
-         + '%%%%' * repeat + '\n'
          + '%%%%' * repeat + '\n'
          + '%%%%' * repeat + '\n'
          + '%%B%' * repeat + '\n'
