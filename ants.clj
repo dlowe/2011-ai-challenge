@@ -252,83 +252,47 @@
 (def loc [7 7])
 (def locs #{[1 1] [2 2] [3 3] [4 4] [5 5]})
 
-(def test-terrain "
-%%%%%
-%a.A%
-%%%%%
+(def map1 "
+rows 3
+cols 5
+players 1
+
+m %%%%%
+m %a.A%
+m %%%%%
 ")
 
-(def tutorial1 
-"rows 43
-cols 39
-players 2
+(defn map-type-locs [row linedata typechar]
+  "Given a 'row' number, and some map line data like '%%.aB**%%', return the
+  list of [row col] locations corresponding to the typechar (like % or *)."
+  (let [filteredlist (filter #(= typechar (first %)) (map list linedata (range)))]
+    (map vector (repeat row) (map second filteredlist))))
 
-m %%%%%...........%%%%%%%...........%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%*.......*.....*.....*.......*%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%............*.B.*............%%%%%
-m %%%%%.............................%%%%%
-m %%%%%..............*..............%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%............%...%............%%%%%
-m %%%%%.............%%%.............%%%%%
-m %%%%%*...........................*%%%%%
-m %%%%%.............%%%.............%%%%%
-m %%%%%............%...%............%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%..............*..............%%%%%
-m %%%%%.............................%%%%%
-m %%%%%............*.A.*............%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%*.......*.....*.....*.......*%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%.............................%%%%%
-m %%%%%...........%%%%%%%...........%%%%%")
+(defn update-game-state-from-map-row [game-state row data]
+  (update-in game-state [:water] into (map-type-locs row data \%)))
 
-;(defn make-game-map [terrain]
-;  (let [lines (
-(defn update-game-map [game-state row data]
-  (loop [col 0 c (first data) rem (rest data)]
-    (condp = c
-      "%" (update-in game-state [:water] conj [row col])
-      "*" (update-in game-state [:food]  conj [row col]))
-    (recur (+ col 1) (first data) (rest data))))
-          
-(defn build-map-info []
-  (loop [row 0 line (read-line) game-info {} game-state {}]
-    (if (empty? line)
-      [game-info game-state]
-      (let [[k v] (string/split line #" ")]
-        (if (= k "m")
-          (recur (+ row 1) (read-line) game-info (update-game-map game-state row v))
-          (recur row (read-line) (assoc game-info (keyword k) (Long/parseLong v)) game-state))))))
+(defn game-from-map []
+  "Assuming *in* is a map file, initialize a game-info and game-state from it and return them."
+  (loop [row 0 line (read-line) game-info {} game-state init-state]
+    (println "found line: " line)
+    (cond 
+     (nil? line)   [game-info game-state]
+     (empty? line) (recur row (read-line) game-info game-state)
+     :t            (let [[k v] (string/split line #" ")]
+                     (if (= k "m")
+                       (recur (+ row 1) 
+                              (read-line) 
+                              game-info 
+                              (update-game-state-from-map-row game-state row v))
+                       (recur row 
+                              (read-line) 
+                              (assoc game-info (keyword k) (Long/parseLong v)) 
+                              game-state))))))
 
-(defn load-game-map [m]
-  (let [[game-info game-state] (with-in-str m (build-map-info))]
-    (def ^{:dynamic true} *game-info* game-info)
-    (def ^{:dynamic true} *game-state* game-state)))
+(defn load-game [mapdata]
+  (let [[gi gs] (with-in-str mapdata (game-from-map))]
+    (def ^{:dynamic true} *game-info* gi)
+    (def ^{:dynamic true} *game-state* gs)))
 
 ; END FOR REPL TESTING
 
