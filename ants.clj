@@ -2,6 +2,8 @@
   (:require [clojure.string :as string])
   (:use clojure.set))
 
+(use 'clojure.stacktrace)
+
 ;;****************************************************************
 ;; Constants and lookups
 ;;****************************************************************
@@ -238,9 +240,52 @@
   (filter #(locations %) (trimmed-from-local-point (game-info :rows) (game-info :cols) loc)))
 
 ; FOR REPL TESTING
-(def ^{:dynamic true} *game-info* {:rows 20 :cols 20})
+;(def ^{:dynamic true} *game-info* {:rows 20 :cols 20})
 (def loc [7 7])
 (def locs #{[1 1] [2 2] [3 3] [4 4] [5 5]})
+
+(def map1 "
+rows 3
+cols 5
+players 1
+
+m %%%%%
+m %a.A%
+m %%%%%
+")
+
+(defn map-type-locs [row linedata typechar]
+  "Given a 'row' number, and some map line data like '%%.aB**%%', return the
+  list of [row col] locations corresponding to the typechar (like % or *)."
+  (let [filteredlist (filter #(= typechar (first %)) (map list linedata (range)))]
+    (map vector (repeat row) (map second filteredlist))))
+
+(defn update-game-state-from-map-row [game-state row data]
+  (update-in game-state [:water] into (map-type-locs row data \%)))
+
+(defn game-from-map []
+  "Assuming *in* is a map file, initialize a game-info and game-state from it and return them."
+  (loop [row 0 line (read-line) game-info {} game-state init-state]
+    (println "found line: " line)
+    (cond 
+     (nil? line)   [game-info game-state]
+     (empty? line) (recur row (read-line) game-info game-state)
+     :t            (let [[k v] (string/split line #" ")]
+                     (if (= k "m")
+                       (recur (+ row 1) 
+                              (read-line) 
+                              game-info 
+                              (update-game-state-from-map-row game-state row v))
+                       (recur row 
+                              (read-line) 
+                              (assoc game-info (keyword k) (Long/parseLong v)) 
+                              game-state))))))
+
+(defn load-game [mapdata]
+  (let [[gi gs] (with-in-str mapdata (game-from-map))]
+    (def ^{:dynamic true} *game-info* gi)
+    (def ^{:dynamic true} *game-state* gs)))
+
 ; END FOR REPL TESTING
 
 (defn- parse-tile [msg]
