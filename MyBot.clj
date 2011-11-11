@@ -1,6 +1,6 @@
 (ns MyBot
-  (:use ants)
-  (:use paths))
+  (:use ants))
+  ;(:use paths))
 
 (def directions [:north :east :west :south])
 
