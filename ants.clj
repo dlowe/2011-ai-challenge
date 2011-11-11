@@ -225,27 +225,19 @@
     (do ;(binding [*out* *err*] (println "trimmed-from-origin:" rows cols result))
       result)))))
 
-(defn origin-point-to-local-point [rows cols [r c]]
-  [(if (neg? r) (+ rows r) r) (if (neg? c) (+ cols c) c)])
+(def origin-point-to-local-point (memoize (fn [rows cols [r c]]
+  [(if (neg? r) (+ rows r) (rem r rows)) (if (neg? c) (+ cols c) (rem c cols))])))
 
-(defn trimmed-from-local-point [rows cols [r c]]
+(def trimmed-from-local-point (memoize (fn [rows cols [r c]]
   "Returns lazy sequence of coordinates on a map sized (rows x cols), ordered by distance from
    the given point."
-  (do
-    (assert (>= r 0))
-    (assert (>= c 0))
-    (assert (< r rows))
-    (assert (< c cols))
-    (let [result (map #(let [[dr dc] %] (origin-point-to-local-point rows cols [(rem (+ r dr) rows) (rem (+ c dc) cols)])) (trimmed-from-origin rows cols))]
-      (do ;(binding [*out* *err*] (println "trimmed-from-local-point:" rows cols r c result))
-        result))))
+  (map (fn [[dr dc]] (origin-point-to-local-point rows cols [(+ r dr) (+ c dc)]))
+    (trimmed-from-origin rows cols)))))
 
 (defn nearest [loc locations]
-  "Return the location in collection 'locations' which is closest to loc.
-  Use David's oneliner instead of my ugly mess."
-  (sort-by (partial distance loc) locations)
-  ;(filter #(locations %) (trimmed-from-local-point (game-info :rows) (game-info :cols) loc))
-)
+  "Return the location in set 'locations' which is closest to loc by traversing in the
+   order given by 'trimmed-from-local-point'"
+  (filter #(locations %) (trimmed-from-local-point (game-info :rows) (game-info :cols) loc)))
 
 ; FOR REPL TESTING
 ;(def ^{:dynamic true} *game-info* {:rows 20 :cols 20})
@@ -313,7 +305,7 @@ m %%%%%
         :water (union (set (turn-state-grep ts :water)) (:water pre-turn-state))
         :dead (set (turn-state-grep ts :dead-ant))
         :enemies (set (remove #(== (% 2) 0) (turn-state-grep ts :ant)))
-        :ants (set (filter #(== (% 2) 0) (turn-state-grep ts :ant)))
+        :ants (set (for [[row col player] (turn-state-grep ts :ant) :when (== player 0)] [row col]))
         :food (set (turn-state-grep ts :food))
         :hill (set (turn-state-grep ts :hill))
       })))
