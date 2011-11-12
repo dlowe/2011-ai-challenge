@@ -110,5 +110,28 @@ class TestBlockedGreed(TestTactic, unittest.TestCase):
         ## food is reachable in 7 moves
         self.assertFoodEaten(1, 4, turn=7)
 
+class TestNotOverlyPolite(TestTactic, unittest.TestCase):
+    """Shouldn't wait an extra turn for same-team ants to move out of the way."""
+
+    map = """
+          %%%%%%%%%
+          %%%*%%%%%
+          %%%.%%%%%
+          %Aa.%%%%%
+          %%%.%%%%%
+          %%%.%%%B%
+          %%%*%%%%%
+          %%%%%%%%%
+          """
+
+    def assertions(self, game):
+        ## no dying!
+        self.assertSurvived()
+        self.assertEquals(game['replaydata']['cutoff'], 'turn limit reached')
+
+        ## food are reachable in 
+        self.assertFoodEaten(1, 3, turn=2)
+        self.assertFoodEaten(6, 3, turn=4)
+
 if __name__ == '__main__':
     unittest.main(argv=sys.argv)
