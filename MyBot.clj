@@ -18,7 +18,9 @@
   "Given an ant (ie. location) and a list of occupied locations, and some 
   possible directions the ant might want to go, filter the list of directions
   to only contain legal and non-suicidal moves."
-  (filter #(and (valid-move? ant %) (not (contains? occupied (move-ant ant %)))) possible-directions))
+  (filter
+    #(let [loc (move-ant ant %)] (and (passable? loc) (not (contains? occupied loc))))
+    possible-directions))
 
 (defn pick-random-no-suicide-direction [ant occupied]
   (first (filter-moves ant occupied (shuffle directions))))
@@ -44,8 +46,6 @@
         
 (defn select-move [ant occupied strategy]
   (condp = strategy
-    ; pick random direction, taking into account obstacles
-    :random             (first (filter #(valid-move? ant %) (shuffle directions)))
     ; pick random direction, taking care not to suicide
     :random-no-suicide  (pick-random-no-suicide-direction ant occupied)
     ; pretty sure we can't make a "righty" bot without remembering what dir the ant was moving in last turn
