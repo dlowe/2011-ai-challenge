@@ -46,7 +46,7 @@
                 "d" :dead-ant
                 "h" :hill})
 
-(def ant-tiles #{:ant :dead-ant})
+(def ant-tiles #{:ant :dead-ant :hill})
 
 ;;****************************************************************
 ;; Implementation functions
@@ -125,6 +125,11 @@
   "Get a set of food locations"
   []
   (:food *game-state*))
+
+(defn hills
+  "Get a set of hill locations"
+  []
+  (:hill *game-state*))
 
 
 (defn unit-distance 
@@ -279,7 +284,7 @@ m %%%%%
         :enemies (set (for [[row col player] (turn-state-grep ts :ant) :when (not (== player 0))] [row col]))
         :ants (set (for [[row col player] (turn-state-grep ts :ant) :when (== player 0)] [row col]))
         :food (set (turn-state-grep ts :food))
-        :hill (set (turn-state-grep ts :hill))
+        :hill (set (for [[row col player] (turn-state-grep ts :hill) :when (not (== player 0))] [row col]))
       })))
 
 (defn play-turn [pre-turn-state bot]

@@ -19,13 +19,14 @@
   (first (filter-moves ant occupied vacated (shuffle directions))))
 
 (defn raw-objectives []
-  ; this returns a lazy sequence of 'objectives' in no particular order
-  ; each objective currently consists of a label and a center.
-  ; (currently ':food', the location of a food)
+  "this returns a lazy sequence of 'objectives' in no particular order
+   each objective currently consists of a label and a center.
+   (labels currently are :food or :raze)"
+  (set (concat
+    (for [food_location (food)] [:food food_location])
+    (for [hill_location (hills)] [:raze hill_location])))
   ; TODO: take radius into account
-  (set (for [food_location (food)] [:food food_location]))
   ; TODO: objective representing "stay within the view radius of places where food has been seen before"
-  ; TODO: objective representing "get on top of known enemy hills (radius 0)"
   ; TODO: objective representing "stay within the attack radius of my own hill"
   ; TODO: objective representing "get within view radius of unknown space"
 )
