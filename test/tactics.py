@@ -133,5 +133,24 @@ class TestNotOverlyPolite(TestTactic, unittest.TestCase):
         self.assertFoodEaten(1, 3, turn=2)
         self.assertFoodEaten(6, 3, turn=4)
 
+class TestRazing(TestTactic, unittest.TestCase):
+    """In the absence of other inputs, aggressively raze enemy hills!"""
+
+    map = """
+          %%%%%%%%%%%
+          %A....%%%b%
+          %.....%%%%%
+          %....1%%%%%
+          %%%%%%%%%%%
+          """
+
+    def assertions(self, game):
+        ## no dying!
+        self.assertSurvived()
+
+        ## the enemy hill is reachable in 6 moves
+        self.assertEquals(game['replaydata']['cutoff'], 'rank stabilized')
+        self.assertEquals(game['game_length'], 6)
+
 if __name__ == '__main__':
     unittest.main(argv=sys.argv)
