@@ -82,29 +82,29 @@
     :when (not (nil? dir))] [ant dir])))
 
 (defn move-ants [initial-ants]
-  (loop [ants initial-ants objectives (raw-objectives) ant-dirs [] destinations #{}]
+  (loop [ants initial-ants objectives (raw-objectives) ant-dirs [] occupied #{}]
     (do ;(binding [*out* *err*] (println "move-ants:" objectives ants))
     (if (empty? ants)
       ; no ants to move, we're done!
       ant-dirs
       (if (empty? objectives)
         ; no objectives remain, just shuffle remaining ants
-        (let [ant (first ants) others (rest ants) dir (select-move ant destinations :random-no-suicide)]
+        (let [ant (first ants) others (rest ants) dir (select-move ant occupied :random-no-suicide)]
           (if dir
-            (recur others objectives (cons [ant dir] ant-dirs) (conj destinations (move-ant ant dir)))
-            (recur others objectives ant-dirs destinations)))
+            (recur others objectives (cons [ant dir] ant-dirs) (conj occupied (move-ant ant dir)))
+            (recur others objectives ant-dirs occupied)))
         ; otherwise, try to accomplish the top objective
         (let [[objective candidates] (prioritized-objective-ants objectives ants)
               others (disj objectives objective)
-              ant-dir (move-ant-todo objective candidates destinations)]
+              ant-dir (move-ant-todo objective candidates occupied)]
           (if (nil? ant-dir)
             ; skipping this objective; all ants remain available
-            (recur ants others ant-dirs destinations)
+            (recur ants others ant-dirs occupied)
             ; move an ant
             (let [ant (first ant-dir) dir (second ant-dir)]
               ; TODO: if we take radius into account, an ant may 'incidentally' achieve multiple
               ; objectives, which we would want to filter out of 'others' at this point.
-              (recur (disj ants ant) others (cons [ant dir] ant-dirs) (conj destinations (move-ant ant dir)))))))))))
+              (recur (disj ants ant) others (cons [ant dir] ant-dirs) (conj occupied (move-ant ant dir)))))))))))
 
 (defn simple-bot []
   (do ;(binding [*out* *err*] (println "simple-bot"))
