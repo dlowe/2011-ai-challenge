@@ -46,7 +46,7 @@
                 "d" :dead-ant
                 "h" :hill})
 
-(def ant-tiles #{:ant :dead-ant})
+(def ant-tiles #{:ant :dead-ant :hill})
 
 ;;****************************************************************
 ;; Implementation functions
@@ -66,22 +66,6 @@
 
 (defn- get-turn [msg]
   (Integer. (or (second (string/split msg #" ")) 0)))
-
-(defn- update-tile [state {:keys [tile row col player]}]
-  (let [loc [row col]]
-        (condp = tile
-          :water (update-in state [:water] conj loc)
-          :dead-ant (update-in state [:dead] conj (conj loc player))
-          :ant (if (zero? player)
-                 (update-in state [:ants] conj loc) 
-                 (update-in state [:enemies] conj (conj loc player)))
-          :food (update-in state [:food] conj loc)
-          :hill (update-in state [:hill] conj loc))))
-
-(defn- contains-ant? [ants cur]
-  (some #(let [[r c p] %]
-             (= [r c] cur))
-          ants))
 
 (defn move-ant 
   "Return the location defined by moving the given ant in the given
@@ -142,6 +126,11 @@
   []
   (:food *game-state*))
 
+(defn hills
+  "Get a set of hill locations"
+  []
+  (:hill *game-state*))
+
 
 (defn unit-distance 
   "Get the vector distance between two points on a torus. Negative deltas are 
@@ -164,27 +153,15 @@
   (let [[dx dy] (unit-distance loc loc2)]
     (Math/sqrt (+ (Math/pow dx 2) (Math/pow dy 2)))))
 
-(defn unoccupied? 
-  "If the given location does not contain an ant or food, return loc"
-  [loc]
-  (when (and (not (contains-ant? (food) loc)) 
-             (not (contains-ant? (my-ants) loc))
-             (not (contains-ant? (enemy-ants) loc)))
-    loc))
 
 (defn passable? 
   "Deteremine if the given location can be moved to. If so, loc is returned."
   [loc]
   (when (and (not (contains? (*game-state* :water) loc))
-             (unoccupied? loc))
+             (not (contains? (*game-state* :ants) loc))
+             (not (contains? (*game-state* :enemies) loc))
+             (not (contains? (*game-state* :food) loc)))
     loc))
-
-(defn valid-move? 
-  "Check if moving an ant in the given direction is passable. If so,
-  return the location that the ant would then be in."
-  [ant dir]
-  (passable? (move-ant ant dir)))
-
 
 (defn direction [loc loc2]
   "Determine the directions needed to move to reach a specific location.
@@ -306,10 +283,10 @@ m %%%%%
         :turn 0
         :water (union (set (turn-state-grep ts :water)) (:water pre-turn-state))
         :dead (set (turn-state-grep ts :dead-ant))
-        :enemies (set (remove #(== (% 2) 0) (turn-state-grep ts :ant)))
+        :enemies (set (for [[row col player] (turn-state-grep ts :ant) :when (not (== player 0))] [row col]))
         :ants (set (for [[row col player] (turn-state-grep ts :ant) :when (== player 0)] [row col]))
         :food (set (turn-state-grep ts :food))
-        :hill (set (turn-state-grep ts :hill))
+        :hill (set (for [[row col player] (turn-state-grep ts :hill) :when (not (== player 0))] [row col]))
       })))
 
 (defn play-turn [pre-turn-state bot]
