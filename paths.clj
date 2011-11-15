@@ -37,10 +37,11 @@ m .....*....")
 
 (defn 
   #^{:test (fn []
-             (let [[*game-info* *game-state*] (with-in-str map3x3 (game-from-map))]
-               (assert (= 4 (count (neighbors [1 1]))))
-               (assert (= (into #{} (neighbors [1 1])) #{[0 1] [1 0] [1 2] [2 1]}))
-               (assert (= (into #{} (neighbors [0 0])) #{[2 0] [0 1] [1 0] [0 2]}))))}
+             (load-game map3x3)
+             ;(println "neighbors test func, *game-info* " ants/*game-info* ", *game-state* " *game-state*)
+             (assert (= 4 (count (neighbors [1 1]))))
+             (assert (= (into #{} (neighbors [1 1])) #{[0 1] [1 0] [1 2] [2 1]}))
+             (assert (= (into #{} (neighbors [0 0])) #{[2 0] [0 1] [1 0] [0 2]})))}
   neighbors [loc]
   "Return a list of neighboring locations which are valid moves.
   FIX: this should probably only take into account water, not ant locations,
@@ -69,11 +70,11 @@ m .....*....")
 ;
 (defn 
   #^{:test (fn []
-             (let [[*game-info* *game-state*] (with-in-str partitionedmap (game-from-map))]
-               (assert (= 0 (count (straight-line [0 0] [0 0]))))
-               (let [p (straight-line [0 0] [2 0])]
-                 (assert (= (list [2 0]) p)))
-               (assert (empty? (straight-line [0 0] [1 2])))))}
+             (load-game partitionedmap)
+             (assert (= 0 (count (straight-line [0 0] [0 0]))))
+             (let [p (straight-line [0 0] [2 0])]
+               (assert (= (list [2 0]) p)))
+             (assert (empty? (straight-line [0 0] [1 2]))))}
   straight-line [loc goal]
   "Simplest thing that could possibly work; try to find a straight line
   path from loc to goal.  Return empty path if there is no such clear path."
@@ -111,7 +112,9 @@ m .....*....")
             closed  (conj closed cur)]
         ;(println "cur " cur ", open " open ", closed " closed)
         (if (= cur goal)
-          (rest (reverse (nodes-to-root parents cur)))
+          (let [path (rest (reverse (nodes-to-root parents cur)))]
+            (println "greedy-best-first " loc goal " found " path)
+            path)
           (if (empty? open)
             nil
             (recur (first (peek open)) (pop open) closed parents (+ iters 1))))))))

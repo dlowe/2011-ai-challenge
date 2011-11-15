@@ -190,16 +190,18 @@
   "Determine the directions needed to move to reach a specific location.
   This does not attempt to avoid water. The result will be a collection
   containing up to two directions."
-  (let [[dr dc] (unit-distance loc loc2)
-        row (if-not (zero? dr)
-            (/ dr (Math/abs dr))
-            dr)
-        col (if-not (zero? dc)
-            (/ dc (Math/abs dc))
-            dc)]
-    (filter #(not (nil? %))
-            [(offset-dir [row 0])
-             (offset-dir [0 col])])))
+  (if (or (nil? loc) (nil? loc2))
+    nil
+    (let [[dr dc] (unit-distance loc loc2)
+          row (if-not (zero? dr)
+                (/ dr (Math/abs dr))
+                dr)
+          col (if-not (zero? dc)
+                (/ dc (Math/abs dc))
+                dc)]
+      (filter #(not (nil? %))
+              [(offset-dir [row 0])
+               (offset-dir [0 col])]))))
 
 (defn from-origin-n [n]
   "Return the vector of coordinates exactly n moves from the origin"
@@ -266,7 +268,7 @@ m %%%%%
 (defn game-from-map []
   "Assuming *in* is a map file, initialize a game-info and game-state from it and return them."
   (loop [row 0 line (read-line) game-info {} game-state init-state]
-    (println "found line: " line)
+    ;(println "found line: " line)
     (cond 
      (nil? line)   [game-info game-state]
      (empty? line) (recur row (read-line) game-info game-state)
