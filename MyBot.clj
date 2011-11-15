@@ -4,18 +4,19 @@
 
 (def directions [:north :east :west :south])
 
-(defn filter-moves [ant occupied possible-directions]
+(defn filter-moves [ant occupied vacated possible-directions]
   "Given an ant (ie. location) and a list of occupied locations, and some 
   possible directions the ant might want to go, filter the list of directions
   to only contain legal and non-suicidal moves."
   (do ;(binding [*out* *err*] (println ant occupied possible-directions))
     (for [dir possible-directions
       :let [loc (move-ant ant dir)]
-      :when (and (passable? loc) (not (contains? occupied loc)))] [dir loc])))
+      :when (and (or (contains? vacated loc) (passable? loc)) (not (contains? occupied loc)))]
+      [dir loc])))
 
-(defn pick-random-no-suicide-direction [ant occupied]
+(defn pick-random-no-suicide-direction [ant occupied vacated]
   "What it says on the tin!"
-  (first (filter-moves ant occupied (shuffle directions))))
+  (first (filter-moves ant occupied vacated (shuffle directions))))
 
 (defn raw-objectives []
   ; this returns a lazy sequence of 'objectives' in no particular order
@@ -37,35 +38,35 @@
   "return the 'easiest' [ant, objective] tuple, where 'easiest' == closest to the closest associated ant"
   (first (sort-by (fn [[[_ goal] ants]] (distance goal (first ants))) (all-objective-ants objectives remaining-ants))))
 
-(defn move-ant-todo [objective ants occupied]
+(defn move-ant-todo [objective ants occupied vacated]
   "returns a legal [ant, dir, loc] moving an ant toward the objective, or nil if impossible to do so"
   (first (for [ant ants
-    :let [[dir loc :as dir-loc] (first (filter-moves ant occupied (direction ant (second objective))))]
+    :let [[dir loc :as dir-loc] (first (filter-moves ant occupied vacated (direction ant (second objective))))]
     :when (not (nil? dir-loc))] [ant dir loc])))
 
 (defn move-ants [initial-ants]
-  (loop [ants initial-ants objectives (raw-objectives) ant-dirs [] occupied #{}]
+  (loop [ants initial-ants objectives (raw-objectives) ant-dirs [] occupied #{} vacated #{}]
     (do ;(binding [*out* *err*] (println "move-ants:" objectives ants))
     (if (empty? ants)
       ; no ants to move, we're done!
       ant-dirs
       (if (empty? objectives)
         ; no objectives remain, just shuffle remaining ants
-        (let [ant (first ants) others (rest ants) [dir loc] (pick-random-no-suicide-direction ant occupied)]
+        (let [ant (first ants) others (rest ants) [dir loc] (pick-random-no-suicide-direction ant occupied vacated)]
           (if dir
-            (recur others objectives (cons [ant dir] ant-dirs) (conj occupied loc))
-            (recur others objectives ant-dirs occupied)))
+            (recur others objectives (cons [ant dir] ant-dirs) (conj occupied loc) (conj vacated ant))
+            (recur others objectives ant-dirs occupied vacated)))
         ; otherwise, try to accomplish the top objective
         (let [[objective candidates] (prioritized-objective-ants objectives ants)
               others (disj objectives objective)
-              [ant dir loc :as ant-dir-loc] (move-ant-todo objective candidates occupied)]
+              [ant dir loc :as ant-dir-loc] (move-ant-todo objective candidates occupied vacated)]
           (if (nil? ant-dir-loc)
             ; skipping this objective; all ants remain available
-            (recur ants others ant-dirs occupied)
+            (recur ants others ant-dirs occupied vacated)
             ; move an ant
             ; TODO: if we take radius into account, an ant may 'incidentally' achieve multiple
             ; objectives, which we would want to filter out of 'others' at this point.
-            (recur (disj ants ant) others (cons [ant dir] ant-dirs) (conj occupied loc)))))))))
+            (recur (disj ants ant) others (cons [ant dir] ant-dirs) (conj occupied loc) (conj vacated ant)))))))))
 
 (defn simple-bot []
   (do ;(binding [*out* *err*] (println "simple-bot"))
