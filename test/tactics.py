@@ -76,12 +76,9 @@ class TestShitloadsOfFoodAndAnts(TestTactic, unittest.TestCase):
     """Ants should be able to gather food efficiently even when there's lots of it and lots of them."""
 
     repeat = 60
-    map = ('%%%%' * repeat + '\n'
-         + '%*.A' * repeat + '\n'
-         + '%%%%' * repeat + '\n'
-         + '%%%%' * repeat + '\n'
-         + '%%B%' * repeat + '\n'
-         + '%%%%' * repeat + '\n')
+    map = ('%%%%' * repeat + '%%%%%%\n'
+         + '%*.A' * repeat + '%%%B%%\n'
+         + '%%%%' * repeat + '%%%%%%\n')
 
     def assertions(self, game):
         ## no dying!
