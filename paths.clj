@@ -47,7 +47,7 @@ m .....*....")
   FIX: this should probably only take into account water, not ant locations,
   for the purposes of planning a route to a goal."
   ;(println "neighbors " loc)
-  (for [d (filter #(valid-move? loc %) [:north :west :south :east])] (move-ant loc d)))
+  (filter #(passable? %) (map #(move-ant loc %) [:north :west :south :east])))
 
 (defn nodes-to-root [tree node] 
   "If tree is a map of child to parent links, and node is a node label, return
@@ -55,7 +55,7 @@ m .....*....")
   (loop [cur node res []] 
     ; (println "twig for tree " tree ", node " node)
     (if (not (contains? tree cur))
-      res 
+       res 
       (recur (tree cur) (conj res cur)))))
 
 
@@ -81,11 +81,11 @@ m .....*....")
   (loop [path [] pos loc]
     (if (= pos goal)
       (rest (conj path pos))
-      (let [d (filter #(valid-move? pos %) (direction pos goal))]
+      (let [locs (filter #(passable? %) (map #(move-ant pos %) (direction pos goal)))]
         ;(println "pos " pos ", d " d)
-        (if (empty? d)
+        (if (empty? locs)
           nil
-          (recur (conj path pos) (move-ant pos (first d))))))))
+          (recur (conj path pos) (first locs)))))))
 
 (defn- make-to-open-filter [open closed]
   #(and (not (contains? closed %)) (not (contains? open %))))
@@ -98,22 +98,23 @@ m .....*....")
   "Return a list of locations which is a valid path from loc to goal, or nil
   if no such path exists.  estimator should be a function of 2 locations which
   gives an estimated cost for a path from one to the other."
+  ;(binding [*out* *err*] (println "calling greedy-best-first with " loc goal))
   (loop [cur loc             ; the location we're handling right now
          open (priority-map) ; a priority map of loc -> priority, holds locations to check
          closed #{loc}       ; set of nodes we've already inspected
          parents {loc nil}   ; a map of (loc -> parent) entries to reconstruct path
          iters 0]
-    (if (or (not cur) (> iters 20))
+    (if (or (not cur) (> iters 200))
       nil
       (let [lastcur (get closed cur)
             to-open (filter (make-to-open-filter open closed) (neighbors cur))
             open    (into open (map list to-open (map #(estimator % goal) to-open)))
             parents (into parents (map hash-map to-open (repeat cur)))
             closed  (conj closed cur)]
-        ;(println "cur " cur ", open " open ", closed " closed)
+        ;(binding [*out* *err*] (println "cur " cur ", open " open ", closed " closed "at iter " iters))
         (if (= cur goal)
           (let [path (rest (reverse (nodes-to-root parents cur)))]
-            (println "greedy-best-first " loc goal " found " path)
+            ;(binding [*out* *err*] (println "greedy-best-first " loc goal " found " path))
             path)
           (if (empty? open)
             nil

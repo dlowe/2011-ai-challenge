@@ -1,6 +1,6 @@
 (ns MyBot
-  (:use ants))
-  ;(:use paths))
+  (:use ants)
+  (:use paths))
 
 (def directions [:north :east :west :south])
 
@@ -42,12 +42,13 @@
 (defn move-ant-todo [objective ants occupied vacated]
   "returns a legal [ant, dir, loc] moving an ant toward the objective, or nil if impossible to do so"
   (first (for [ant ants
-    :let [[dir loc :as dir-loc] (first (filter-moves ant occupied vacated (direction ant (second objective))))]
+    :let [path (greedy-best-first ant (second objective) ants/distance)
+          [dir loc :as dir-loc] (first (filter-moves ant occupied vacated (direction ant (first path))))]
     :when (not (nil? dir-loc))] [ant dir loc])))
 
 (defn move-ants [initial-ants]
   (loop [ants initial-ants objectives (raw-objectives) ant-dirs [] occupied #{} vacated #{}]
-    (do ;(binding [*out* *err*] (println "move-ants:" objectives ants))
+    ;(do (binding [*out* *err*] (println "move-ants:" objectives ants))
     (if (empty? ants)
       ; no ants to move, we're done!
       ant-dirs
@@ -67,7 +68,7 @@
             ; move an ant
             ; TODO: if we take radius into account, an ant may 'incidentally' achieve multiple
             ; objectives, which we would want to filter out of 'others' at this point.
-            (recur (disj ants ant) others (cons [ant dir] ant-dirs) (conj occupied loc) (conj vacated ant)))))))))
+            (recur (disj ants ant) others (cons [ant dir] ant-dirs) (conj occupied loc) (conj vacated ant))))))))
 
 (defn simple-bot []
   (do ;(binding [*out* *err*] (println "simple-bot"))

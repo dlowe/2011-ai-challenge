@@ -160,7 +160,10 @@
   (when (and (not (contains? (*game-state* :water) loc))
              (not (contains? (*game-state* :ants) loc))
              (not (contains? (*game-state* :enemies) loc))
-             (not (contains? (*game-state* :food) loc)))
+             ; do we really have to exclude food locations?  if we get close, we eat it, problem solved
+             ; if we make them non-passable, then the path search excludes them as valid cels to visit!
+             ;(not (contains? (*game-state* :food) loc))
+             )
     loc))
 
 (defn direction [loc loc2]
