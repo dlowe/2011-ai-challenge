@@ -292,8 +292,8 @@ m %%%%%
   (for [[t data] turn-state :when (identical? tile-t t)] data))
 
 (defn turn-state-grep-player0 [ts tile-t op]
-  "Return the set of locations of tile-t tiles where (op player 0) is true"
-  (set (for [[row col player] (turn-state-grep ts tile-t) :when (op player 0)] [row col])))
+  "Return a sequence of locations of tile-t tiles where (op player 0) is true"
+  (for [[row col player] (turn-state-grep ts tile-t) :when (op player 0)] [row col]))
 
 (defn start-state [rows cols]
   {
@@ -318,12 +318,12 @@ m %%%%%
           (set (turn-state-grep ts :water))
           (:water pre-turn-state))
         :dead (set (turn-state-grep ts :dead-ant))
-        :enemies (turn-state-grep-player0 ts :ant not=)
+        :enemies (set (turn-state-grep-player0 ts :ant not=))
         :ants (set my-ants)
         :food (set (turn-state-grep ts :food))
         :hill (union
           (difference (:hill pre-turn-state) visible)
-          (turn-state-grep-player0 ts :hill not=))
+          (set (turn-state-grep-player0 ts :hill not=)))
         :unknown (difference (:unknown pre-turn-state) visible)
       })))
 
