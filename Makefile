@@ -1,5 +1,5 @@
 ZIP   := 2011-ai-challenge.zip
-FILES := MyBot.clj ants.clj clojure/data/priority_map.clj
+FILES := MyBot.clj ants.clj paths.clj clojure/data/priority_map.clj
 
 .PHONY: test
 test:
