@@ -48,7 +48,7 @@
 
 (defn move-ants [initial-ants]
   (loop [ants initial-ants objectives (raw-objectives) ant-dirs [] occupied #{} vacated #{}]
-    ;(do (binding [*out* *err*] (println "move-ants:" objectives ants))
+    (do ;(binding [*out* *err*] (println "move-ants:" objectives ants))
     (if (empty? ants)
       ; no ants to move, we're done!
       ant-dirs
@@ -68,7 +68,7 @@
             ; move an ant
             ; TODO: if we take radius into account, an ant may 'incidentally' achieve multiple
             ; objectives, which we would want to filter out of 'others' at this point.
-            (recur (disj ants ant) others (cons [ant dir] ant-dirs) (conj occupied loc) (conj vacated ant))))))))
+            (recur (disj ants ant) others (cons [ant dir] ant-dirs) (conj occupied loc) (conj vacated ant)))))))))
 
 (defn simple-bot []
   (do ;(binding [*out* *err*] (println "simple-bot"))
