@@ -163,8 +163,6 @@ class TestHoldGrudge(TestTactic, unittest.TestCase):
         ## no dying!
         self.assertSurvived()
 
-        print game
-
         ## the closer ant is killed trying to raze the hill...
         ## but though it's out of sight, the second ant still remembers where it is and goes
         ## to raze it efficiently.
