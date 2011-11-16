@@ -11,14 +11,6 @@
 (declare ^{:dynamic true} *game-info*)
 (declare ^{:dynamic true} *game-state*)
 
-(def init-state {:turn 0
-                 :water #{}
-                 :dead #{}
-                 :enemies #{}
-                 :ants #{}
-                 :food #{}
-                 :hill #{}})
-
 (def dir-sym {:north "N"
               :south "S"
               :east "E"
@@ -183,43 +175,62 @@
               [(offset-dir [row 0])
                (offset-dir [0 col])]))))
 
-(defn from-origin-n [n]
+(defn moves-from-origin-n [n]
   "Return the vector of coordinates exactly n moves from the origin"
   (if (zero? n)
     '([0 0])
     (for [[r c dr dc] [[n 0 -1 +1] [0 n -1 -1] [(- n) 0 +1 -1] [0 (- n) +1 +1]] i (range n)]
       [(+ r (* i dr)) (+ c (* i dc))])))
 
-(defn from-origin []
-  "Return a lazy, infinite sequence of coordinates ordered by distance from the origin"
-  (for [n (range) coord (from-origin-n n)] coord))
+(defn moves-from-origin []
+  "Return a lazy, infinite sequence of coordinates ordered by move distance from the origin"
+  (for [n (range) coord (moves-from-origin-n n)] coord))
 
 (defn extents [rows cols]
   "Returns AABB bounding box coordinates for a map sized (rows x cols)"""
   (let [qr (quot (- rows 1) 2) rr (rem (- rows 1) 2) qc (quot (- cols 1) 2) rc (rem (- cols 1) 2)]
     [(- qr) (- qc) (+ qr rr) (+ qc rc)]))
 
-(def trimmed-from-origin (memoize (fn [rows cols]
-  "Return finite sequence of coordinates on a map sized (rows x cols), ordered by distance from
+(defn trim-from-origin [rows cols move-generator]
+  (let [[min_r min_c max_r max_c] (extents rows cols) r-ok? (fn [r] (and (<= r max_r) (>= r min_r))) c-ok? (fn [c] (and (<= c max_c) (>= c min_c)))]
+    (doall (for [[r c] (move-generator) :while (or (r-ok? r) (c-ok? c)) :when (and (r-ok? r) (c-ok? c)
+)] [r c]))))
+
+(def trimmed-moves-from-origin (memoize (fn [rows cols]
+  "Return finite sequence of coordinates on a map sized (rows x cols), ordered by move distance from
    the origin."
-  (let [result (let [[min_r min_c max_r max_c] (extents rows cols) r-ok? (fn [r] (and (<= r max_r) (>= r min_r))) c-ok? (fn [c] (and (<= c max_c) (>= c min_c)))]
-    (doall (for [[r c] (from-origin) :while (or (r-ok? r) (c-ok? c)) :when (and (r-ok? r) (c-ok? c))] [r c])))]
-    (do ;(binding [*out* *err*] (println "trimmed-from-origin:" rows cols result))
-      result)))))
+  (trim-from-origin rows cols moves-from-origin))))
 
 (def origin-point-to-local-point (memoize (fn [rows cols [r c]]
   [(if (neg? r) (+ rows r) (rem r rows)) (if (neg? c) (+ cols c) (rem c cols))])))
 
-(def trimmed-from-local-point (memoize (fn [rows cols [r c]]
-  "Returns lazy sequence of coordinates on a map sized (rows x cols), ordered by distance from
+(def trimmed-moves-from-local-point (memoize (fn [rows cols [r c]]
+  "Returns lazy sequence of coordinates on a map sized (rows x cols), ordered by move distance from
    the given point."
   (map (fn [[dr dc]] (origin-point-to-local-point rows cols [(+ r dr) (+ c dc)]))
-    (trimmed-from-origin rows cols)))))
+    (trimmed-moves-from-origin rows cols)))))
+
+(defn views-from-origin [radius]
+  "Return sequence of coordinates within n distance from the origin on an infinite map"
+  (let [orange (range (- radius) (+ radius 1))
+        odist (fn [r c] (Math/sqrt (+ (Math/pow r 2) (Math/pow c 2))))]
+    (for [r orange c orange :when (<= (odist r c) radius)] [r c])))
+
+(def trimmed-views-from-origin (memoize (fn [radius rows cols]
+  "Return the sequence of coordinates on a map sized (rows x cols) which are within n distance from the
+   origin"
+  (trim-from-origin rows cols (partial views-from-origin radius)))))
+
+(defn trimmed-views-from-local-point [radius rows cols [r c]]
+  "Return the set of coordinates on a map sized (rows x cols) which are within n distance from the
+   given point."
+  (set (map (fn [[dr dc]] (origin-point-to-local-point rows cols [(+ r dr) (+ c dc)]))
+    (trimmed-views-from-origin radius rows cols))))
 
 (defn nearest [loc locations]
   "Return the location in set 'locations' which is closest to loc by traversing in the
-   order given by 'trimmed-from-local-point'"
-  (filter #(locations %) (trimmed-from-local-point (game-info :rows) (game-info :cols) loc)))
+   order given by 'trimmed-moves-from-local-point'"
+  (filter #(locations %) (trimmed-moves-from-local-point (game-info :rows) (game-info :cols) loc)))
 
 ; FOR REPL TESTING
 ;(def ^{:dynamic true} *game-info* {:rows 20 :cols 20})
@@ -247,7 +258,7 @@ m %%%%%
 
 (defn game-from-map []
   "Assuming *in* is a map file, initialize a game-info and game-state from it and return them."
-  (loop [row 0 line (read-line) game-info {} game-state init-state]
+  (loop [row 0 line (read-line) game-info {} game-state {}]
     ;(println "found line: " line)
     (cond 
      (nil? line)   [game-info game-state]
@@ -277,19 +288,43 @@ m %%%%%
       [tile-t [(Integer. row) (Integer. col)]])))
 
 (defn turn-state-grep [turn-state tile-t]
+  "Return a sequence of tile-t tiles"
   (for [[t data] turn-state :when (identical? tile-t t)] data))
 
+(defn turn-state-grep-player0 [ts tile-t op]
+  "Return the set of locations of tile-t tiles where (op player 0) is true"
+  (set (for [[row col player] (turn-state-grep ts tile-t) :when (op player 0)] [row col])))
+
+(defn start-state [rows cols]
+  {
+    :turn 0
+    :water #{}
+    :dead #{}
+    :enemies #{}
+    :ants #{}
+    :food #{}
+    :hill #{}
+    :unknown (set (for [row (range rows) col (range cols)] [row col]))
+  })
+
 (defn turn-state [pre-turn-state turn-state-strings]
-  (let [ts (map parse-tile turn-state-strings)]
+  (let [ts (map parse-tile turn-state-strings)
+        my-ants (turn-state-grep-player0 ts :ant ==)
+        visible (set (for [ant my-ants v (trimmed-views-from-local-point (int (Math/sqrt (*game-info* :viewradius2))) (*game-info* :rows) (*game-info* :cols) ant)] v))]
     (do ;(binding [*out* *err*] (println pre-turn-state ts))
       {
         :turn 0
-        :water (union (set (turn-state-grep ts :water)) (:water pre-turn-state))
+        :water (union
+          (set (turn-state-grep ts :water))
+          (:water pre-turn-state))
         :dead (set (turn-state-grep ts :dead-ant))
-        :enemies (set (for [[row col player] (turn-state-grep ts :ant) :when (not (== player 0))] [row col]))
-        :ants (set (for [[row col player] (turn-state-grep ts :ant) :when (== player 0)] [row col]))
+        :enemies (turn-state-grep-player0 ts :ant not=)
+        :ants (set my-ants)
         :food (set (turn-state-grep ts :food))
-        :hill (set (for [[row col player] (turn-state-grep ts :hill) :when (not (== player 0))] [row col]))
+        :hill (union
+          (difference (:hill pre-turn-state) visible)
+          (turn-state-grep-player0 ts :hill not=))
+        :unknown (difference (:unknown pre-turn-state) visible)
       })))
 
 (defn play-turn [pre-turn-state bot]
@@ -306,7 +341,7 @@ m %%%%%
   (when (message? :turn (read-line))
     (binding [*game-info* (build-game-info)]
       (println "go") ;; we're "setup" so let's start
-      (loop [state init-state]
+      (loop [state (start-state (game-info :rows) (game-info :cols))]
         (let [cur (read-line)]
           (if (message? :end cur)
             (collect-stats)
