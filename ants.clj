@@ -1,8 +1,7 @@
 (ns ants
   (:require [clojure.string :as string])
-  (:use clojure.set))
-
-(use 'clojure.stacktrace)
+  (:use (clojure set stacktrace))
+  (:use clojure.contrib.profile))
 
 ;;****************************************************************
 ;; Constants and lookups
@@ -11,7 +10,10 @@
 (declare ^{:dynamic true} *game-info*)
 (declare ^{:dynamic true} *game-state*)
 
+(defn now [] (new java.util.Date))
+
 (def init-state {:turn 0
+                 :tstamp (.getTime (now))
                  :water #{}
                  :dead #{}
                  :enemies #{}
@@ -88,12 +90,6 @@
 ;;****************************************************************
 ;; Public functions
 ;;****************************************************************
-
-;; TODO: if you want to collect the information and do something
-;; with it at the end, do so here. Look at build-game-info as an
-;; example
-(defn- collect-stats []
-  )
 
 (defn game-info
   "Get some value from the setup information of the game"
@@ -280,6 +276,7 @@ m %%%%%
   (for [[t data] turn-state :when (identical? tile-t t)] data))
 
 (defn turn-state [pre-turn-state turn-state-strings]
+  (prof :turn-state
   (let [ts (map parse-tile turn-state-strings)]
     (do ;(binding [*out* *err*] (println pre-turn-state ts))
       {
@@ -291,11 +288,21 @@ m %%%%%
         :food (set (turn-state-grep ts :food))
         :hill (set (for [[row col player] (turn-state-grep ts :hill) :when (not (== player 0))] [row col]))
       })))
+  )
+
+;; TODO: if you want to collect the information and do something
+;; with it at the end, do so here. Look at build-game-info as an
+;; example
+(defn- collect-stats [state]
+  (if *enable-profiling*
+    (binding [*out* *err*]
+      (println "COLLECT STATS: turn " (:turn state) ", with " (count (:ants state)) " ants")
+      (print-summary (summarize (deref *profile-data*))))))
 
 (defn play-turn [pre-turn-state bot]
   "Play a single turn with the given bot."
   (let [state (turn-state pre-turn-state (for [cur (repeatedly read-line) :while (message? :tile cur)] cur))]
-    (binding [*game-state* state]
+    (binding [*game-state* (assoc state :tstamp (now))]
       (bot)
       (println "go")
       state)))
@@ -308,6 +315,7 @@ m %%%%%
       (println "go") ;; we're "setup" so let's start
       (loop [state init-state]
         (let [cur (read-line)]
+          (collect-stats state)
           (if (message? :end cur)
-            (collect-stats)
+            (collect-stats state)
             (recur (play-turn state bot))))))))

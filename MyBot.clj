@@ -1,4 +1,5 @@
 (ns MyBot
+  (:use clojure.contrib.profile)
   (:use ants)
   (:use paths))
 
@@ -8,11 +9,13 @@
   "Given an ant (ie. location) and a list of occupied locations, and some 
   possible directions the ant might want to go, filter the list of directions
   to only contain legal and non-suicidal moves."
+  (prof :filter-moves
   (do ;(binding [*out* *err*] (println ant occupied possible-directions))
     (for [dir possible-directions
       :let [loc (move-ant ant dir)]
       :when (and (or (contains? vacated loc) (passable? loc)) (not (contains? occupied loc)))]
       [dir loc])))
+  )
 
 (defn pick-random-no-suicide-direction [ant occupied vacated]
   "What it says on the tin!"
@@ -22,9 +25,10 @@
   "this returns a lazy sequence of 'objectives' in no particular order
    each objective currently consists of a label and a center.
    (labels currently are :food or :raze)"
+  (prof :raw-objectives
   (set (concat
     (for [food_location (food)] [:food food_location])
-    (for [hill_location (hills)] [:raze hill_location])))
+    (for [hill_location (hills)] [:raze hill_location]))))
   ; TODO: take radius into account
   ; TODO: objective representing "stay within the view radius of places where food has been seen before"
   ; TODO: objective representing "stay within the attack radius of my own hill"
@@ -37,7 +41,9 @@
 
 (defn prioritized-objective-ants [objectives remaining-ants]
   "return the 'easiest' [ant, objective] tuple, where 'easiest' == closest to the closest associated ant"
+  (prof :prioritized-objective-ants
   (first (sort-by (fn [[[_ goal] ants]] (distance goal (first ants))) (all-objective-ants objectives remaining-ants))))
+  )
 
 (defn move-ant-todo [objective ants occupied vacated]
   "returns a legal [ant, dir, loc] moving an ant toward the objective, or nil if impossible to do so"
@@ -47,8 +53,9 @@
     :when (not (nil? dir-loc))] [ant dir loc])))
 
 (defn move-ants [initial-ants]
+  (prof :move-ants
   (loop [ants initial-ants objectives (raw-objectives) ant-dirs [] occupied #{} vacated #{}]
-    ;(do (binding [*out* *err*] (println "move-ants:" objectives ants))
+    ;(do (binding [*out* *err*] (println "move-ants:" objectives ants)))
     (if (empty? ants)
       ; no ants to move, we're done!
       ant-dirs
@@ -69,10 +76,11 @@
             ; TODO: if we take radius into account, an ant may 'incidentally' achieve multiple
             ; objectives, which we would want to filter out of 'others' at this point.
             (recur (disj ants ant) others (cons [ant dir] ant-dirs) (conj occupied loc) (conj vacated ant))))))))
+  )
 
 (defn simple-bot []
   (do ;(binding [*out* *err*] (println "simple-bot"))
     (doseq [[ant dir] (move-ants (my-ants))]
       (move ant dir))))
       
-(start-game simple-bot)
+(with-profile-data (start-game simple-bot))

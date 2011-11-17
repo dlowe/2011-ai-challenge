@@ -1,5 +1,8 @@
 (ns paths
+  (:use clojure.contrib.profile)
   (:use ants))
+
+(use 'clojure.contrib.profile)
 ;  (:use clojure.data.priority-map))
 
 (use 'clojure.data.priority-map)
@@ -47,7 +50,9 @@ m .....*....")
   FIX: this should probably only take into account water, not ant locations,
   for the purposes of planning a route to a goal."
   ;(println "neighbors " loc)
+  (prof :neighbors
   (filter #(passable? %) (map #(move-ant loc %) [:north :west :south :east])))
+  )
 
 (defn nodes-to-root [tree node] 
   "If tree is a map of child to parent links, and node is a node label, return
@@ -78,6 +83,7 @@ m .....*....")
   straight-line [loc goal]
   "Simplest thing that could possibly work; try to find a straight line
   path from loc to goal.  Return empty path if there is no such clear path."
+  (prof :straight-line
   (loop [path [] pos loc]
     (if (= pos goal)
       (rest (conj path pos))
@@ -86,6 +92,7 @@ m .....*....")
         (if (empty? locs)
           nil
           (recur (conj path pos) (first locs)))))))
+  )
 
 (defn- make-to-open-filter [open closed]
   #(and (not (contains? closed %)) (not (contains? open %))))
@@ -94,17 +101,25 @@ m .....*....")
 ; 
 ; Greedy best first actually works now!
 ;
-(defn greedy-best-first [loc goal estimator]
+(defn 
+  #^{:test (fn [] 
+             (load-game (slurp "tools/maps/maze/maze_06p_01.map"))
+             (assert (greedy-best-first [1 4] [77 77] ants/distance 200000000)))}
+  greedy-best-first 
   "Return a list of locations which is a valid path from loc to goal, or nil
   if no such path exists.  estimator should be a function of 2 locations which
   gives an estimated cost for a path from one to the other."
+  ([loc goal] (greedy-best-first loc goal ants/distance 200))
+  ([loc goal estimator] (greedy-best-first loc goal estimator 200))
+  ([loc goal estimator nturns]
   ;(binding [*out* *err*] (println "calling greedy-best-first with " loc goal))
+  (prof :greedy-best-first
   (loop [cur loc             ; the location we're handling right now
          open (priority-map) ; a priority map of loc -> priority, holds locations to check
          closed #{loc}       ; set of nodes we've already inspected
          parents {loc nil}   ; a map of (loc -> parent) entries to reconstruct path
          iters 0]
-    (if (or (not cur) (> iters 200))
+    (if (or (not cur) (> iters nturns))
       nil
       (let [lastcur (get closed cur)
             to-open (filter (make-to-open-filter open closed) (neighbors cur))
@@ -118,7 +133,8 @@ m .....*....")
             path)
           (if (empty? open)
             nil
-            (recur (first (peek open)) (pop open) closed parents (+ iters 1))))))))
+            (recur (first (peek open)) (pop open) closed parents (+ iters 1)))))))))
+  )
                
 ;
 ; Found A* overview at http://www.policyalmanac.org/games/aStarTutorial.htm simple enough for me ;)

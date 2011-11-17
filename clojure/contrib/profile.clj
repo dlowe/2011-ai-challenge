@@ -37,10 +37,11 @@ under the JVM.  See the function documentation for more details.
 "}
   clojure.contrib.profile)
 
-(def *profile-data* nil)
+(def ^{:dynamic true} *profile-data* nil)
 
 (def ^{:doc "Set this to false before loading/compiling to omit
-profiling code."}  *enable-profiling* true)
+profiling code."
+       :dynamic true}  *enable-profiling* false)
 
 (defmacro prof
   "If *enable-profiling* is true, wraps body in profiling code.
@@ -96,7 +97,7 @@ profiling code."}  *enable-profiling* true)
   "Prints a table of the results returned by summarize."
   [profile-summary]
   (let [name-width (apply max 1 (map (comp count name) (keys profile-summary)))
-        fmt-string (str "%" name-width "s  %8d  %8d  %8d  %8d  %8d%n")]
+        fmt-string (str "%" name-width "s  %10d  %10d  %10d  %8d  %13d%n")]
     (printf (.replace fmt-string \d \s)
             "Name" "mean" "min" "max" "count" "sum")
     (doseq [k (sort (keys profile-summary))]
