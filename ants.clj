@@ -1,7 +1,8 @@
 (ns ants
   (:require [clojure.string :as string])
   (:use (clojure set stacktrace))
-  (:use clojure.contrib.profile))
+  (:use clojure.contrib.profile)
+  (:use logging))
 
 ;;****************************************************************
 ;; Constants and lookups
@@ -50,7 +51,7 @@
   (loop [cur (read-line)
          info {}]
     (if (message? :ready cur)
-      info
+      (do (log "begin game" info) info)
       (let [[k v] (string/split cur #" ")
             neue (assoc info (keyword k) (Long/parseLong v))]
         (recur (read-line) neue)))))
@@ -252,7 +253,7 @@ m %%%%%
 (defn game-from-map []
   "Assuming *in* is a map file, initialize a game-info and game-state from it and return them."
   (loop [row 0 line (read-line) game-info {} game-state {}]
-    ;(println "found line: " line)
+    ;(log "found line: " line)
     (cond 
      (nil? line)   [game-info game-state]
      (empty? line) (recur row (read-line) game-info game-state)
@@ -297,16 +298,22 @@ m %%%%%
     :ants #{}
     :food #{}
     :hill #{}
-    :unknown (set (for [row (range rows) col (range cols)] [row col]))
+    ;:unknown (set (for [row (range rows) col (range cols)] [row col]))
   })
+
+(defn ms-to-ns [ms]
+  (* ms 1000000))
 
 (defn turn-state [pre-turn-state turn-state-strings]
   (prof :turn-state
-  (let [ts (map parse-tile turn-state-strings)
+  (let [turn-start (System/nanoTime)
+        ts (map parse-tile turn-state-strings)
         my-ants (turn-state-grep-player0 ts :ant ==)
         visible (set (for [ant my-ants v (trimmed-views-from-local-point (int (Math/sqrt (*game-info* :viewradius2))) (*game-info* :rows) (*game-info* :cols) ant)] v))]
-    (do ;(binding [*out* *err*] (println pre-turn-state ts))
+    (do ;(log pre-turn-state ts)
       {
+        :turn-start turn-start
+        :clever-limit (+ turn-start (* 0.75 (ms-to-ns (:turntime *game-info*))))
         :turn 0
         :water (union
           (set (turn-state-grep ts :water))
@@ -318,7 +325,7 @@ m %%%%%
         :hill (union
           (difference (:hill pre-turn-state) visible)
           (set (turn-state-grep-player0 ts :hill not=)))
-        :unknown (difference (:unknown pre-turn-state) visible)
+        ;:unknown (difference (:unknown pre-turn-state) visible)
       })))
   )
 
@@ -335,6 +342,7 @@ m %%%%%
   "Play a single turn with the given bot."
   (let [state (turn-state pre-turn-state (for [cur (repeatedly read-line) :while (message? :tile cur)] cur))]
     (binding [*game-state* state]
+      (log "begin turn at " (:turn-start *game-state*) " clever-limit " (:clever-limit *game-state*))
       (bot)
       (println "go")
       state)))

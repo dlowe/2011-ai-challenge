@@ -1,11 +1,8 @@
 (ns paths
   (:use clojure.contrib.profile)
-  (:use ants))
-
-(use 'clojure.contrib.profile)
-;  (:use clojure.data.priority-map))
-
-(use 'clojure.data.priority-map)
+  (:use clojure.data.priority-map)
+  (:use ants)
+  (:use logging))
 
 ; Some utilities for path finding
 
@@ -41,7 +38,7 @@ m .....*....")
 (defn 
   #^{:test (fn []
              (load-game map3x3)
-             ;(println "neighbors test func, *game-info* " ants/*game-info* ", *game-state* " *game-state*)
+             ;(log "neighbors test func, *game-info* " ants/*game-info* ", *game-state* " *game-state*)
              (assert (= 4 (count (neighbors [1 1]))))
              (assert (= (into #{} (neighbors [1 1])) #{[0 1] [1 0] [1 2] [2 1]}))
              (assert (= (into #{} (neighbors [0 0])) #{[2 0] [0 1] [1 0] [0 2]})))}
@@ -49,7 +46,7 @@ m .....*....")
   "Return a list of neighboring locations which are valid moves.
   FIX: this should probably only take into account water, not ant locations,
   for the purposes of planning a route to a goal."
-  ;(println "neighbors " loc)
+  ;(log "neighbors " loc)
   (prof :neighbors
   (filter #(passable? %) (map #(move-ant loc %) [:north :west :south :east])))
   )
@@ -58,7 +55,7 @@ m .....*....")
   "If tree is a map of child to parent links, and node is a node label, return
   the vector of nodes leading from node to the root in the tree."
   (loop [cur node res []] 
-    ; (println "twig for tree " tree ", node " node)
+    ; (log "twig for tree " tree ", node " node)
     (if (not (contains? tree cur))
        res 
       (recur (tree cur) (conj res cur)))))
@@ -88,7 +85,7 @@ m .....*....")
     (if (= pos goal)
       (rest (conj path pos))
       (let [locs (filter #(passable? %) (map #(move-ant pos %) (direction pos goal)))]
-        ;(println "pos " pos ", d " d)
+        ;(log "pos " pos ", d " d)
         (if (empty? locs)
           nil
           (recur (conj path pos) (first locs)))))))
@@ -98,29 +95,41 @@ m .....*....")
   #(and (not (contains? closed %)) (not (contains? open %))))
 
 
+(defn- out-of-time? [start-ns tslice-ns]
+  (let [now (System/nanoTime) 
+        elapsed (- now start-ns)
+        exceeded-cleverlimit (> now (:clever-limit *game-state*))
+        exceeded-timeslice (> elapsed tslice-ns)]
+    (if exceeded-cleverlimit
+      (log "out-of-time at " now "due to exceeding clever-limit of " (:clever-limit *game-state*)))
+    (if exceeded-timeslice
+      (log "out-of-time at " now "due to exceeding tslice-ns of " tslice-ns))
+    (or exceeded-cleverlimit exceeded-timeslice)))
+
 ; 
 ; Greedy best first actually works now!
 ;
 (defn 
   #^{:test (fn [] 
              (load-game (slurp "tools/maps/maze/maze_06p_01.map"))
-             (assert (greedy-best-first [1 4] [77 77] ants/distance 200000000)))}
+             (assert (greedy-best-first [1 4] [77 77] ants/distance 20000000000)))}
   greedy-best-first 
   "Return a list of locations which is a valid path from loc to goal, or nil
   if no such path exists.  estimator should be a function of 2 locations which
   gives an estimated cost for a path from one to the other."
-  ([loc goal] (greedy-best-first loc goal ants/distance 200))
-  ([loc goal estimator] (greedy-best-first loc goal estimator 200))
-  ([loc goal estimator nturns]
-  ;(binding [*out* *err*] (println "calling greedy-best-first with " loc goal))
+  ([loc goal]           (greedy-best-first loc goal ants/distance 10000000))
+  ([loc goal estimator] (greedy-best-first loc goal estimator 10000000))
+  ([loc goal estimator tslice-ns]
+  ;(log "calling greedy-best-first with " loc goal)
   (prof :greedy-best-first
+  (let [starttime (System/nanoTime)]
   (loop [cur loc             ; the location we're handling right now
          open (priority-map) ; a priority map of loc -> priority, holds locations to check
          closed #{loc}       ; set of nodes we've already inspected
          parents {loc nil}   ; a map of (loc -> parent) entries to reconstruct path
          iters 0]
-    (if (or (not cur) (> iters nturns))
-      nil
+    (if (or (not cur) (out-of-time? starttime tslice-ns))
+      (do (log "give up on greedy, cur " cur ", elapsed " (- (System/nanoTime) starttime) ", tslice-ns " tslice-ns) nil)
       (let [lastcur (get closed cur)
             to-open (filter (make-to-open-filter open closed) (neighbors cur))
             open    (into open (map list to-open (map #(estimator % goal) to-open)))
@@ -129,13 +138,13 @@ m .....*....")
         ;(binding [*out* *err*] (println "cur " cur ", open " open ", closed " closed "at iter " iters))
         (if (= cur goal)
           (let [path (rest (reverse (nodes-to-root parents cur)))]
-            ;(binding [*out* *err*] (println "greedy-best-first " loc goal " found " path))
+            (log "greedy-best-first " loc goal " found " path)
             path)
           (if (empty? open)
             nil
-            (recur (first (peek open)) (pop open) closed parents (+ iters 1)))))))))
+            (recur (first (peek open)) (pop open) closed parents (+ iters 1))))))))))
   )
-               
+
 ;
 ; Found A* overview at http://www.policyalmanac.org/games/aStarTutorial.htm simple enough for me ;)
 ; Wikipiedia pseudo code didn't really make it clear to me somehow.
