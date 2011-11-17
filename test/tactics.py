@@ -149,5 +149,25 @@ class TestRazing(TestTactic, unittest.TestCase):
         self.assertEquals(game['replaydata']['cutoff'], 'rank stabilized')
         self.assertEquals(game['game_length'], 6)
 
+class TestHoldGrudge(TestTactic, unittest.TestCase):
+    """Don't forget where hills are when they are out of sight."""
+
+    map = """
+          %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+          %%%%%.A.............a..1%%%%%
+          %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+          %%%%%%%%%%%%%%%%%%%%%b%%%%b%%
+          """
+
+    def assertions(self, game):
+        ## no dying!
+        self.assertSurvived()
+
+        ## the closer ant is killed trying to raze the hill...
+        ## but though it's out of sight, the second ant still remembers where it is and goes
+        ## to raze it efficiently.
+        self.assertEquals(game['replaydata']['cutoff'], 'rank stabilized')
+        self.assert_(game['game_length'] <= 20)
+
 if __name__ == '__main__':
     unittest.main(argv=sys.argv)
